@@ -39,38 +39,18 @@ def refined_triangle_inequality_ips_squared(gram_matrix: np.ndarray) -> np.ndarr
     """
     An algorithm for bounding the maximum over unit vector v and subset S of size k out of n rows of X of:
             sum of ips squared (S, v) = sum_{i in S} <X_i, v>^2
-    Let Sigma_S be defined as: sum_{i in S} X_i X_i ^T
-    Therefore, sum of ips squared (S, v) = v^T Sigma_S v = sum_{i in S} v^T X_i X_i^T v.
+    Let Sigma_T be defined as: sum_{i in T} X_i X_i ^T
+    Therefore, sum of ips squared (T, v) = v^T Sigma_S v = sum_{i in T} v^T X_i X_i^T v.
     We can use a series of relaxations:
     v^T Sigma v <= (CS inequality, Norm{v} = 1) <= max{lambda(Sigma)} = (lambda(Sigma) = lambda(G)) = max{lambda(G)}
-    where G_ij = <X_i, X_j> is the Gram matrix of X
-    max{lambda(G)} <= (CS inequality) <= sqrt{sum_{i, j in S} G_{i,j}^2}
+    where G_ij = <X_i, X_j> (for i, j in T) is the Gram matrix of X limited to T
+    max{lambda(G)} <= (CS inequality) <= sqrt{sum_{i, j in T} G_{i,j}^2}
 
     From here we can apply the relaxation:
-    max_S{sqrt{sum_{i, j in S} G_{i,j}^2}} <= max_{S, S_1, ..., S_k} sqrt{sum_{i in S, j in S_i} G_{i, j}^2}
+    max_T{sqrt{sum_{i, j in T} G_{i,j}^2}} <= max_{T, T_1, ..., T_k} sqrt{sum_{i in T, j in T_i} G_{i, j}^2}
 
     :param gram_matrix: A matrix whose i,j th entry is the inner product between X_i and X_j.
     :return: A vector of length n-1, whose k th entry is an upper bound on the sum of inner products squared of any vector v
             with any k vectors in X (where k goes from 1 to n).
     """
-    n = gram_matrix.shape[0]
-    # Step 0: square the Gram matrix
-    gram_matrix_sqrd = np.abs(gram_matrix) ** 2
-
-    # Step 1: Copy and zero out the diagonal
-    diag_elements = np.diag(gram_matrix_sqrd).copy()
-    np.fill_diagonal(gram_matrix_sqrd, 0)
-
-    # Step 2: Sort each row
-    sorted_rows = -np.sort(-gram_matrix_sqrd, axis=1)
-
-    # Step 3: Prepend zeros and then compute cumulative sums over rows
-    cumsum_rows = np.cumsum(np.hstack((np.zeros((n, 1)), sorted_rows)), axis=1)
-
-    # Step 4: Add diagonal elements to each row
-    adjusted_rows = cumsum_rows + diag_elements[:, np.newaxis]
-
-    # Step 5: Compute the vector of k largest elements sum for each column
-    result_vector = np.array([np.sum(-np.partition(-adjusted_rows[:, k-1], k)[:k]) for k in tqdm.trange(1, n)])
-
-    return result_vector
+    return refined_triangle_inequality_ips(np.abs(gram_matrix)**2)
