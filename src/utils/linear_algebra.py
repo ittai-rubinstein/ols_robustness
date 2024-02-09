@@ -3,7 +3,7 @@ from typing import Tuple
 import numpy as np
 from numpy.linalg import lstsq
 
-def compute_ols_and_error(X: np.ndarray, Y: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+def compute_ols_and_error(X: np.ndarray, Y: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Computes the best fit beta for the linear regression problem X@beta ≈ Y
     and the standard error of each individual coefficient.
@@ -27,7 +27,7 @@ def compute_ols_and_error(X: np.ndarray, Y: np.ndarray) -> Tuple[np.ndarray, np.
     cov_beta = variance * np.linalg.inv(X.T @ X).diagonal()
     std_error_beta = np.sqrt(cov_beta)
 
-    return beta, std_error_beta
+    return beta, std_error_beta, cov_beta
 
 
 def eigenvectors_below_threshold(matrix: np.ndarray, threshold: float = 1e-3) -> np.ndarray:
