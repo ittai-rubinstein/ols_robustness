@@ -1,8 +1,9 @@
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
-# from tqdm import notebook as ntqdm
-
+CURRENT_FILE = Path(__file__).resolve()
 import enum
 
 class DataConventions(enum.Enum):
@@ -11,7 +12,7 @@ class DataConventions(enum.Enum):
 
 
 def load_martinez_XY(data_conventions: DataConventions = DataConventions.PYTHON):
-    martinez = pd.read_csv('../robustness_auditing-main/data/martinez.csv')
+    martinez = pd.read_csv(CURRENT_FILE.parent / 'data_files' / 'martinez.csv')
 
     # The martinez table was originally generated in the R convention that one value of each one-hot encoding
     # should be omitted and that we add an intercept variable to avoid colinearity issues.
@@ -44,19 +45,37 @@ def load_martinez_XY(data_conventions: DataConventions = DataConventions.PYTHON)
             iyear_1993_index = col_order.index('_Iyear_1993')
             col_order.insert(iyear_1993_index, col_order.pop(col_order.index('_Iyear_1992')))
             martinez = martinez[col_order]
+    elif data_conventions == DataConventions.R:
+        # The dataset is already almost in the R convention.
+        # This convention is that a one-hot encoding should have a column for each value but one
+        # and an offset column of ones. This is done in order to avoid colinearity issues with multiple
+        # one-hot encodings.
+        # However, the R code does not automatically save this offset column when generating a csv file.
+        martinez.insert(0, 'offset', 1)
+    else:
+        raise NotImplementedError(f"Unrecognized data conventions: {data_conventions}")
 
-    Y = martinez["lngdp14"].to_numpy()
+    label = "lngdp14"
+    main_feature = "lndn13_fiw"
+
     # grab only the columns we care about, and
     # reorder columns so that lndn13_fiw is last since
     # this is the coefficient whose sign we care about.
     # we are following Martinez, equation 6
     keys = martinez.columns.to_list()
-    keys.remove("lndn13_fiw")
-    if data_conventions:
-        # Ittai's change: these two parameters are linearly dependent on other parameters of the fit.
-        keys.remove('Dfree_avg9213')
-        keys.remove('Dpfree_avg9213')
-        keys.remove('Dnfree_avg9213')
-    keys = keys[4:] + ["lndn13_fiw"]
+
+    # Ittai's change: these two parameters are linearly dependent on other parameters of the fit.
+    keys.remove('Dfree_avg9213')
+    keys.remove('Dpfree_avg9213')
+    keys.remove('Dnfree_avg9213')
+    # Remove irrelevant columns
+    keys.remove('countrycode')
+    keys.remove('countryname')
+    keys.remove('year')
+    # Remove label and main feature:
+    keys.remove(main_feature)
+    keys.remove(label)
+    keys.append(main_feature)
     X = martinez[keys].to_numpy()
+    Y = martinez[label].to_numpy()
     return X, Y
