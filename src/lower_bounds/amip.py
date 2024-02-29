@@ -16,20 +16,20 @@ def compute_beta_and_f(norm_X: np.ndarray, residuals: np.ndarray, w: np.ndarray,
     return beta, f_w
 
 
-def f(w: np.ndarray, norm_X: np.ndarray, residuals: np.ndarray, e: np.ndarray) -> float:
-    _, f_w = compute_beta_and_f(norm_X, residuals, w, e)
+def f(w: np.ndarray, X: np.ndarray, residuals: np.ndarray, e: np.ndarray) -> float:
+    _, f_w = compute_beta_and_f(X, residuals, w, e)
     return f_w
 
 
-def approximate_most_influential_pertrubation(norm_X: np.ndarray, residuals: np.ndarray, e: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+def approximate_most_influential_pertrubation(X: np.ndarray, residuals: np.ndarray, e: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     # Initial weights (all ones)
-    w_ones = np.ones(norm_X.shape[0])
+    w_ones = np.ones(X.shape[0])
 
     # Compute gradient of f at w=ones
-    grad_f = grad(f)(w_ones, norm_X, residuals, e)
+    grad_f = grad(f)(w_ones, X, residuals, e)
 
     # Verify f(w=ones) is approximately 0
-    if not np.isclose(f(w_ones, norm_X, residuals, e), 0, atol=1e-6):
+    if not np.isclose(f(w_ones, X, residuals, e), 0, atol=1e-6):
         raise ValueError("f(w=ones) does not evaluate to 0.")
 
     # Sort indices based on gradient values in descending order

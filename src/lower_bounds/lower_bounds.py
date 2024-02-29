@@ -2,6 +2,8 @@ import numpy as np
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import List, Optional, Tuple
+
+import scipy
 import tqdm
 
 from src.lower_bounds.amip import approximate_most_influential_pertrubation
@@ -74,9 +76,10 @@ import numpy as np
 from typing import List
 
 def compute_removal_effects(
-        norm_X: np.ndarray, residuals: np.ndarray,
+        X: np.ndarray, residuals: np.ndarray,
         axis_of_interest: np.ndarray,
-        ordered_indices: List[int], k_vals: np.ndarray = None
+        ordered_indices: List[int],
+        k_vals: np.ndarray = None, verbose: bool = True, normalized: bool = True
 ) -> np.ndarray:
     """
     Computes the effect of removing the first k samples from the linear regression.
@@ -92,6 +95,13 @@ def compute_removal_effects(
     Returns:
     - ndarray: An array of scores corresponding to each k in k_vals.
     """
+    if normalized:
+        norm_X = X
+    else:
+        Sigma = X.T @ X
+        root_Sigma = scipy.linalg.sqrtm(Sigma)
+        norm_X = X @ np.linalg.inv(root_Sigma)
+        axis_of_interest = np.linalg.inv(root_Sigma) @ axis_of_interest
     num_samples = norm_X.shape[0]
 
     # Set default k_vals if not provided
@@ -117,7 +127,7 @@ def compute_removal_effects(
     scores = np.zeros(len(k_vals))
     identity_matrix = np.eye(norm_X.shape[1])
 
-    for i, k_val in enumerate(tqdm.tqdm(k_vals)):
+    for i, k_val in enumerate(tqdm.tqdm(k_vals, desc="Computing removal effects", disable=not verbose)):
         sum_outer_products = cum_outer_products[k_val - 1] if k_val > 0 else np.zeros_like(identity_matrix)
         sum_XR = cum_XR[k_val - 1] if k_val > 0 else np.zeros_like(XR[0])
 

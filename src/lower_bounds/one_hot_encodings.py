@@ -87,8 +87,10 @@ def compute_quadrants_vectorized(samples: np.ndarray, one_hot_encodings: List[On
                 CS = len(one_hot_samples) / (len(one_hot_samples) - weight)
 
                 # Compute the value using vectorized operations
-                value = (quadrant_dots * quadrant_residuals).sum() + \
-                        quadrant_dots.sum() * quadrant_residuals.sum() * CS
+                # value = (quadrant_dots * quadrant_residuals).sum() + \
+                #         quadrant_dots.sum() * quadrant_residuals.sum() * CS
+
+                value = quadrant_dots.sum() * quadrant_residuals.sum() * CS
 
                 results.append(QuadrantInfo(col_index, quadrant, indices.tolist(), weight, value, col_name))
 
