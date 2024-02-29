@@ -1,7 +1,7 @@
 import numpy as np
 import tqdm
 
-def refined_triangle_inequality_ips(gram_matrix: np.ndarray) -> np.ndarray:
+def refined_triangle_inequality_ips(gram_matrix: np.ndarray, verbose: bool = True) -> np.ndarray:
     """
     An algorithm for bounding the l2 norm of any subset of size k of out a set of vectors.
     The algorithm takes as input the Gram matrix, and utilizes the observation that for any set T of samples,
@@ -30,7 +30,8 @@ def refined_triangle_inequality_ips(gram_matrix: np.ndarray) -> np.ndarray:
     adjusted_rows = cumsum_rows + diag_elements[:, np.newaxis]
 
     # Step 5: Compute the vector of k largest elements sum for each column and take the square root
-    result_vector = np.sqrt([np.sum(-np.partition(-adjusted_rows[:, k-1], k)[:k]) for k in tqdm.trange(1, n)])
+    result_vector = np.sqrt([np.sum(-np.partition(-adjusted_rows[:, k-1], k)[:k])
+                             for k in tqdm.trange(1, n, desc="Compiling triangle bounds", disable=not verbose)])
 
     return result_vector
 
