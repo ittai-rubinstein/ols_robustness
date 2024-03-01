@@ -36,7 +36,7 @@ def refined_triangle_inequality_ips(gram_matrix: np.ndarray, verbose: bool = Tru
     return result_vector
 
 
-def refined_triangle_inequality_ips_squared(gram_matrix: np.ndarray) -> np.ndarray:
+def refined_triangle_inequality_ips_squared(gram_matrix: np.ndarray, verbose: bool = True) -> np.ndarray:
     """
     An algorithm for bounding the maximum over unit vector v and subset S of size k out of n rows of X of:
             sum of ips squared (S, v) = sum_{i in S} <X_i, v>^2
@@ -54,4 +54,4 @@ def refined_triangle_inequality_ips_squared(gram_matrix: np.ndarray) -> np.ndarr
     :return: A vector of length n-1, whose k th entry is an upper bound on the sum of inner products squared of any vector v
             with any k vectors in X (where k goes from 1 to n).
     """
-    return refined_triangle_inequality_ips(np.abs(gram_matrix)**2)
+    return refined_triangle_inequality_ips(np.abs(gram_matrix)**2, verbose=verbose)

@@ -116,23 +116,23 @@ def compute_removal_effects(
     outer_products = np.einsum('bi,bj->bij', reordered_X, reordered_X)
 
     # Compute cumulative sum of outer products
-    cum_outer_products = np.cumsum(outer_products, axis=0)
+    cumsum_outer_products = np.cumsum(outer_products, axis=0)
 
     # Compute XR
     XR = reordered_X * reordered_residuals[:, np.newaxis]
 
     # Compute cumulative sum of XR
-    cum_XR = np.cumsum(XR, axis=0)
+    cumsum_xr = np.cumsum(XR, axis=0)
 
     scores = np.zeros(len(k_vals))
     identity_matrix = np.eye(norm_X.shape[1])
 
     for i, k_val in enumerate(tqdm.tqdm(k_vals, desc="Computing removal effects", disable=not verbose)):
-        sum_outer_products = cum_outer_products[k_val - 1] if k_val > 0 else np.zeros_like(identity_matrix)
-        sum_XR = cum_XR[k_val - 1] if k_val > 0 else np.zeros_like(XR[0])
+        sum_outer_products = cumsum_outer_products[k_val - 1] if k_val > 0 else np.zeros_like(identity_matrix)
+        sum_xr = cumsum_xr[k_val - 1] if k_val > 0 else np.zeros_like(XR[0])
 
         # Calculate the score
         matrix_inv = np.linalg.inv(identity_matrix - sum_outer_products)
-        scores[i] = np.dot(axis_of_interest, matrix_inv @ sum_XR)
+        scores[i] = np.dot(axis_of_interest, matrix_inv @ sum_xr)
 
     return scores

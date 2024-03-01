@@ -105,31 +105,31 @@ def normalize_and_split_dataframes(
     # Concatenate all dataframes
     all_data = pd.concat(dataframes, ignore_index=True)
 
-    # Separate features (X) and residuals (Y)
-    X = all_data.drop(columns=['residuals'])
-    Y = sign * all_data['residuals']
+    # Separate features (X) and residuals (R)
+    features = all_data.drop(columns=['residuals'])
+    residuals = sign * all_data['residuals']
 
     # Compute Sigma and its square root
-    Sigma = X.T @ X
-    root_Sigma = scipy.linalg.sqrtm(Sigma)
+    feature_covariance = features.T @ features
+    root_feature_covariance = scipy.linalg.sqrtm(feature_covariance)
 
     # Normalize X
-    norm_X = X @ np.linalg.inv(root_Sigma)
+    normalized_features = features @ np.linalg.inv(root_feature_covariance)
 
     # Split normalized X and Y back into the original dataframe structure
     split_X, split_R = [], []
     start_idx = 0
     for df in dataframes:
         end_idx = start_idx + len(df)
-        split_X.append(norm_X.iloc[start_idx:end_idx].to_numpy())
-        split_R.append(Y.iloc[start_idx:end_idx].to_numpy())
+        split_X.append(normalized_features.iloc[start_idx:end_idx].to_numpy())
+        split_R.append(residuals.iloc[start_idx:end_idx].to_numpy())
         start_idx = end_idx
 
     # Create an unnormalized axis of interest
-    unnormalized_axis_of_interest = (X.columns == feature_of_interest).astype(int)
+    axis_of_interest = (features.columns == feature_of_interest).astype(int)
 
     # Normalize the axis of interest
-    axis_of_interest_normalized = np.linalg.inv(root_Sigma) @ unnormalized_axis_of_interest
+    axis_of_interest_normalized = np.linalg.inv(root_feature_covariance) @ axis_of_interest
 
     return split_X, split_R, axis_of_interest_normalized
 
@@ -182,8 +182,21 @@ def calculate_bounds_efficient(
     X: np.ndarray, R: np.ndarray, axis_of_interest_normalized: np.ndarray
 ) -> np.ndarray:
     """
-    Calculate the upper bound for the score for k = 0, ..., n for a bucket of data,
-    using an efficient approach with sorting and cumulative sums, considering a normalized axis of interest.
+    We define the score of a bucket / set S to be
+        score(bucket B, set of retained samples S) = negative contribution to Delta =
+        = -sum_{i in S intersect B} Z_i (R_i - E_{j in S intersect B} R_j) =
+        = sum_{i in T intersect B} Z_i (R_i + frac{1}{abs{S intersect B}} sum_{j in T intersect B} R_j)
+
+    It turns out that it is enough to give what seems like a fairly loose bound which can be computed very efficiently.
+    For each of the following values:
+        A = sum_{i in T intersect B} R_i Z_i
+        B = sum_{i in T intersect B} Z_i
+        C = sum_{i in T intersect B} R_i
+    we bound it from above and below by taking the k largest / smallest values in our bucket.
+    We bound B*C from above by max(B_min * C_min, B_max * C_max) and then output an upper bound on:
+        A + frac{1}{abs{S intersect B}} (B*C)
+
+    We do all of this numpy vectorized for all values of abs{T intersect B} = k = 0, ..., abs{B}.
 
     Parameters:
     X (pd.DataFrame): The feature dataframe for a specific bucket.
@@ -225,7 +238,11 @@ def compute_bounds_for_all(
     axis_of_interest_normalized: np.ndarray, verbose: bool = True
 ) -> List[np.ndarray]:
     """
-    Computes the bounds on the scores for each of the split dataframes/buckets.
+    We define the score of a bucket / set S to be
+        score(bucket B, set of retained samples S) = negative contribution to Delta =
+         = -sum_{i in S intersect B} Z_i (R_i - E_{j in S intersect B} R_j) =
+         = sum_{i in T intersect B} Z_i (R_i + frac{1}{abs{S intersect B}} sum_{j in T intersect B} R_j)
+    For each bucket B_j, we bound the maximal score, conditioned on the size of k_j = abs{T intersect B}.
 
     Parameters:
     split_X (List[pd.DataFrame]): A list of split feature dataframes, each corresponding to a different bucket.
@@ -252,18 +269,21 @@ def maximize_total_bound_with_score(
 bounds_list: List[np.ndarray], k_max: int, use_tqdm: bool = True
 ) -> np.ndarray:
     """
-    Dynamic programming algorithm to find the division amongst the smaller dataframes that yields the largest total bound,
-    given a total budget of k, and return both the allocation and the total score bound of this allocation.
+    Dynamic programming algorithm for (easy instance of) integer knapsack.
+    Assume that the input is a list of numpy arrays representing scores as a function of costs. In our case, the costs
+        are samples removed from a bucket and the scores are the potential effect on the linear regression result.
+
+    For a total budget of k (running from 0 to k_max using numpy vectorization), finds the optimal division of the budget
+        between the various buckets, and outputs the highest total score possible as a function of k.
 
     Parameters:
-    bounds_dict (Dict[int, pd.Series]): A dictionary where each key is an identifier for a smaller dataframe and the value
-      is a pandas Series containing the bound for each k for that dataframe.
-    k_total (int): The total budget of k to be distributed amongst the smaller dataframes.
+    :param bounds_list: A list whose jth element is a vector whose kth element represents a bound on the effect of
+        removing k samples from the jth bucket
+    :param k_max: The maximal budget k to be considered.
+    :param use_tqdm: Whether to include a tqdm progress bar
 
     Returns:
-    (Dict[int, int], float): A tuple where the first element is a dictionary with each key being the identifier for a
-     smaller dataframe and the value being the allocated k that maximizes the total bound,
-     and the second element is the total score bound achieved with this allocation.
+    An array whose kth element is a bound on the total effect of k removals.
     """
     # Assuming bounds_dict is available and k_total is defined
     n = len(bounds_list)
@@ -274,8 +294,8 @@ bounds_list: List[np.ndarray], k_max: int, use_tqdm: bool = True
 
     # Fill the DP table
     for i in tqdm.trange(1, n + 1, disable = not use_tqdm,
-                         desc="Dynamic programming for combined influence"):
-        bounds = bounds_list[i - 1]  # Convert bounds to a NumPy array for efficient computation
+                         desc="Dynamic programming"):
+        bounds = bounds_list[i - 1]
         dp[i, :len(bounds)] = bounds[:k_max]
 
         for k in range(1, k_max):
@@ -286,7 +306,6 @@ bounds_list: List[np.ndarray], k_max: int, use_tqdm: bool = True
                 dp[i, k] = max(dp[i, k], np.max(dp[i - 1, valid_updates] + bounds[k - valid_updates]))
 
     # The total score bound is the final value in the DP table
-
     return dp[n, :k_max - 1]
 
 
