@@ -72,9 +72,6 @@ def process_samples(X_orig: np.ndarray, norm_X: np.ndarray, residuals: np.ndarra
     return np.array(final_indices)
 
 
-import numpy as np
-from typing import List
-
 def compute_removal_effects(
         X: np.ndarray, residuals: np.ndarray,
         axis_of_interest: np.ndarray,
