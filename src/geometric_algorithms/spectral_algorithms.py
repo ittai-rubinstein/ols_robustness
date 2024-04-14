@@ -1,12 +1,13 @@
 import numpy as np
-
+import time
 
 def spectral_bound_sum_ips(
         gram_matrix: np.ndarray,
         d: int,
         k_vals: np.ndarray = None,
         eigvals: np.ndarray = None,
-        eigvecs: np.ndarray = None
+        eigvecs: np.ndarray = None,
+        print_tqdm: bool = True
 ) -> np.ndarray:
     """
     Compute an upper bound on the L2 squared norm of the sum of any k rows of the input array
@@ -34,7 +35,12 @@ def spectral_bound_sum_ips(
 
     if eigvals is None or eigvecs is None:
         # Perform eigenvalue decomposition if not provided
+        t0 = time.time()
+        if print_tqdm:
+            print("Performing spectral decomposition...", end=" ", flush=True)
         eigenvalues, eigenvectors = np.linalg.eigh(gram_matrix)
+        if print_tqdm:
+            print(f"Done ({time.time() - t0:.1f} seconds).")
     else:
         # Use provided eigenvalues and eigenvectors
         eigenvalues, eigenvectors = eigvals, eigvecs
