@@ -414,9 +414,9 @@ def ku_triangle_inequality(
         For each vector (represented by a row in the Gram matrix), we divide its entries between:
         - a set of m=num_buckets entries representing the largest entry in each bucket.
         - a set of n-m entries representing entries that are *not* largest within their respective buckets.
-        We can then bound:
-        Norm{sum_i X_i}^2 = sum_{i1, i2} <X_i1, X_i2> =
-        = sum_{i1 in T intersect B_j_l_1, i2 in T intersect B_j_l_2}
+        We can then use the fact that norm^2 = sum over k rows sum over k columns of the gram matrix
+        and relax to allow for any (potentially inconsistent) combination of rows and columns. The only
+        way we use the
 
     :param gram_matrix:
     :param bucket_sizes:
@@ -433,7 +433,7 @@ def ku_triangle_inequality(
     # Each index added to T can only contribute its largest inner product with at most u of the buckets.
     # So we split the potential contributions of the elements of T into those constituting the largest element of their
     # respective buckets and those that do not.
-    for j in tqdm.trange(m, desc="KU Triangle Inequality - splitting rows", disable=not verbose):
+    for j in tqdm.trange(m, desc="KU Triangle Inequality - splitting rows", disable=True):
         start_index, end_index = bucket_indices[j:j+2]
         gram_matrix[:, start_index:end_index] = -np.sort(-gram_matrix[:, start_index:end_index], axis=1)
         best_entries[:, j] = gram_matrix[:, start_index]
@@ -448,7 +448,7 @@ def ku_triangle_inequality(
     # its $k-u$ inner products:
     sample_contributions = np.full((n, u_max, k_max), -np.inf)
     for u in tqdm.trange(
-        min(u_max, k_max), desc="KU Triangle Inequality - combining contributions", disable=not verbose
+        min(u_max, k_max), desc="KU Triangle Inequality - combining contributions", disable=True
     ):
         sample_contributions[:, u, u:k_max] = best_u_contributions[:, u][:, np.newaxis] + best_kmu_contributions[:, :k_max - u]
 
@@ -457,7 +457,7 @@ def ku_triangle_inequality(
     # contributions to choose from. When optimizing T we can only take a summation of exactly u elements from the "best_contributions"
     # and k - u elements from the rest.
     best_contributions = np.zeros((m, u_max, k_max))
-    for j in tqdm.trange(m, desc="KU Triangle Inequality - splitting columns", disable=not verbose):
+    for j in tqdm.trange(m, desc="KU Triangle Inequality - splitting columns", disable=True):
         start_index, end_index = bucket_indices[j:j + 2]
         # Use partition to move the largest elements of this bucket to the start:
         sample_contributions[start_index:end_index, :, :] = -np.partition(-sample_contributions[start_index:end_index, :, :], 0, axis=0)
@@ -478,7 +478,7 @@ def ku_triangle_inequality(
 
     # Initialize norms_squared with -np.inf
     norms_squared = np.full((u_max, k_max), -np.inf)
-    for u in tqdm.trange(u_max, desc="KU Triangle Inequality - combining results", disable=not verbose):
+    for u in tqdm.trange(u_max, desc="KU Triangle Inequality", disable=not verbose):
         for k in range(k_max):
             if k >= u:
                 # Use partition to bring top k-u elements to the front
@@ -488,44 +488,6 @@ def ku_triangle_inequality(
                 # print(f"{norms_squared[u, k]}")
                 norms_squared[u, k] = np.sum(sample_contributions[:k - u, u, k]) + cumsum_best_contributions[u, u, k]
 
-    # # Iterate over k since we need to partition and sum the top k-u elements
-    # for k in tqdm.trange(k_max, desc="KU Triangle Inequality - combining results", disable=not verbose):
-    #     # For each k, work on all u where u <= k (to satisfy k >= u)
-    #     u_indices = np.arange(min(k + 1, u_max))
-    #
-    #     # Partition sample_contributions to bring the top k-u elements to the front
-    #     partition_indices = np.argpartition(-sample_contributions[:, u_indices, k], k - u_indices, axis=0)[:k - u_indices]
-    #
-    #     # Sum over the top k-u elements for sample_contributions
-    #     cumsum_samples = np.cumsum(sample_contributions[partition_indices, u_indices, k], axis=0)
-    #     cumsum_samples = np.concatenate((np.zeros((1, u_max, k_max))))
-    #
-    #     # Add the sum of the u largest elements from cumsum_best_contributions, which is simply cumsum_best_contributions[u]
-    #     norms_squared[u_indices, k] = cumsum_samples + cumsum_best_contributions[u_indices]
-
-
-    # # Sort the sample_contributions so that we can easily access the sums over their largest members:
-    #
-    # # Step 1 - Transpose sample_contributions to bring k to the first axis
-    # scores_transposed = np.transpose(sample_contributions, (2, 1, 0))  # New shape (k_max, u_max, n)
-    #
-    # # Step 2 - Partition on contiguous blocks of memory
-    # for k in tqdm.trange(
-    #     k_max, desc="KU Triangle Inequality Partition", disable=not verbose
-    # ):
-    #     scores_transposed[k, :, :] = -np.partition(-scores_transposed[k, :, :], k, axis=-1)
-    #
-    # # Step 3 - Transpose them back
-    # sample_contributions = np.transpose(scores_transposed, (2, 1, 0))  # Back to (n, u_max, k_max)
-    #
-    # # We never touch the sample_contributions beyond the k_max entry.
-    # sample_contributions = sample_contributions[:k_max+1, :, :]
-    #
-    # cumsum_scores = np.cumsum(sample_contributions, axis=0)
-    # cumsum_scores = np.concatenate((np.zeros((1, u_max, k_max)), cumsum_scores), axis=0)
-    # # Create an array of 'k' indices (for the first dimension of cumsum_scores)
-    # k_indices = np.arange(k_max)
-    # norms_squared = cumsum_scores[k_indices, np.arange(u_max)[:, None], k_indices]
     # Ignore warning about -np.infs in sqrt as these will be removed
     with np.errstate(invalid='ignore'):
         norms = np.sqrt(norms_squared)
