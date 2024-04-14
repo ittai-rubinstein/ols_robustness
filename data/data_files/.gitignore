@@ -1,0 +1,4 @@
+# The raw data for the OHIE study was accessed from this URL: https://www.nber.org/research/data/oregon-health-insurance-experiment-data
+# and then preprocessed using this R script: https://github.com/rgiordan/AMIPPaper/blob/main/writing/applications/OHIE/prepare_OHIE_data.R
+# Unfortunately, we cannot include the raw data in our repository, as that could violate the terms under which the data was published.
+OHIE_data.csv
