@@ -28,6 +28,25 @@ HHHAGE_REPLACEMENTS= {
     'nr': 99  # Replace 'nr' with NaN
 }
 
+
+# Adjusted dictionary with lists of bad values for each column
+BAD_CATEGORICAL_DATA = {
+    "hhhsex": [9.0, "nr"],
+    "hhhalpha": ["nr"],
+    "hhhspouse": ["nr", 2.0],
+    "p16": ["nr"]
+}
+
+def remove_bad_categorical_rows(df, bad_data=None):
+    if bad_data is None:
+        bad_data = BAD_CATEGORICAL_DATA
+    # Iterate over each column and its list of bad values
+    for column, bad_values in bad_data.items():
+        if column in df.columns:
+            # Keep rows where the column value is not in the bad values list
+            df = df[~df[column].isin(bad_values)]
+    return df
+
 def load_angelucci_data(
         which_regression: int = 1
 ) -> List[AngelucciDataset]:
@@ -60,6 +79,8 @@ def load_angelucci_data(
     # Rename the 'hhhage_float' column to 'hhhage'
     filtered_data = filtered_data.rename(columns={'hhhage_float': 'hhhage'})
 
+    filtered_data = remove_bad_categorical_rows(filtered_data)
+
     if which_regression == 1:
         formula = FORMULA1
     else:
@@ -79,6 +100,7 @@ def load_angelucci_data(
                         data=treated_samples,
                         formula=formula,
                         column_of_interest="treatment",
+                        # special_categorical=None
                         special_categorical="region_1" if which_regression == 1 else None
                     )
                 )
