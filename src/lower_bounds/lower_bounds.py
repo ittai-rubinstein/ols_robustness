@@ -72,6 +72,63 @@ def process_samples(X_orig: np.ndarray, norm_X: np.ndarray, residuals: np.ndarra
     return np.array(final_indices)
 
 
+def compute_removal_effects_direct(
+        X: np.ndarray, residuals: np.ndarray,
+        axis_of_interest: np.ndarray,
+        removal_sets: List[List[int]],
+        verbose: bool = True
+) -> np.ndarray:
+    """
+    Compute the effect of removing sets of data points on the projection along a specific axis.
+
+    Parameters:
+    - X (np.ndarray): The n by d feature matrix.
+    - residuals (np.ndarray): The n-dimensional vector of residuals.
+    - axis_of_interest (np.ndarray): The d-dimensional vector of interest for projection.
+    - removal_sets (List[List[int]]): List of lists, each sub-list contains indices that define a removal set.
+    - verbose (bool): If True, show a progress bar.
+
+    Returns:
+    - np.ndarray: An array of removal effects for each removal set.
+    """
+    n, d = X.shape
+
+    # Compute Sigma and check if it is close to identity
+    Sigma = X.T @ X
+    if not np.allclose(Sigma, np.eye(d), atol=1e-5):
+        root_Sigma = scipy.linalg.sqrtm(Sigma)
+        norm_X = X @ np.linalg.inv(root_Sigma)
+        axis_of_interest = np.linalg.inv(root_Sigma) @ axis_of_interest
+    else:
+        norm_X = X
+
+    # Compute outer products for each data point
+    outerproducts = np.einsum('ij,ik->ijk', norm_X, norm_X)
+
+    # Initialize array to store removal effects
+    removal_effects = np.zeros(len(removal_sets))
+
+    # Enumerate over all T in removal sets
+    for idx, T in enumerate(tqdm.tqdm(removal_sets, desc="Computing removal effects", disable=not verbose)):
+        # Compute Sigma_T
+        Sigma_T = np.sum(outerproducts[T], axis=0)
+
+        # Compute (I - Sigma_T)^{-1}
+        try:
+            inv_I_minus_Sigma_T = np.linalg.inv(np.eye(d) - Sigma_T)
+        except np.linalg.LinAlgError:
+            # Handling cases where inversion might fail due to numerical issues
+            inv_I_minus_Sigma_T = np.linalg.pinv(np.eye(d) - Sigma_T)
+
+        # Compute removal effect
+        effective_residuals = norm_X[T].T @ residuals[T]
+        removal_effect = axis_of_interest.T @ inv_I_minus_Sigma_T @ effective_residuals
+        removal_effects[idx] = removal_effect
+
+    return removal_effects
+
+
+
 def compute_removal_effects(
         X: np.ndarray, residuals: np.ndarray,
         axis_of_interest: np.ndarray,

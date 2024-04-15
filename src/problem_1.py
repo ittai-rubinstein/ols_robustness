@@ -18,6 +18,9 @@ class Problem1Params:
     use_triangle_inequality: bool = True
     use_spectral: bool = False
 
+    # We may store the gram matrix even after we are done using it. If this is set to True, we will discard it to save RAM.
+    save_memory: bool = True
+
 
 
 @dataclass
@@ -27,7 +30,7 @@ class Problem1UpperBounds:
     spectral_upper_bound: Optional[np.ndarray] = None
 
 class Problem1:
-    _gram_matrix: np.ndarray
+    _gram_matrix: Optional[np.ndarray] = None
     _params: Problem1Params
     upper_bounds: Problem1UpperBounds
     lower_bounds: Problem1LowerBounds
@@ -44,6 +47,8 @@ class Problem1:
         self._params = params
         self._gram_matrix = gram_matrix
         self.compute_bounds()
+        if self._params.save_memory:
+            self._gram_matrix = None
 
     def compute_bounds(self):
         self.compute_lower_bounds()

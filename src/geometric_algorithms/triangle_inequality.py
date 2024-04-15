@@ -25,12 +25,16 @@ def refined_triangle_inequality_ips(gram_matrix: np.ndarray, verbose: bool = Tru
 
     # Step 2: Sort each row
     sorted_rows = -np.sort(-gram_matrix, axis=1)
+    # Save memory
+    del gram_matrix
 
     # Step 3: Prepend zeros and then compute cumulative sums over rows
     cumsum_rows = np.cumsum(np.hstack((np.zeros((n, 1)), sorted_rows)), axis=1)
+    del sorted_rows
 
     # Step 4: Add diagonal elements to each row
     adjusted_rows = cumsum_rows + diag_elements[:, np.newaxis]
+    del cumsum_rows
 
     # Step 5: Compute the vector of k largest elements sum for each column and take the square root
     result_vector = np.sqrt([np.sum(-np.partition(-adjusted_rows[:, k - 1], k)[:k])

@@ -9,6 +9,17 @@ from typing import List, Optional, Any
 from src.categorical_data.categorical_data import split_and_normalize, perform_regression_and_append_residuals, \
     normalize_and_split_dataframes
 
+def drop_zero_std_columns(df: pd.DataFrame) -> pd.DataFrame:
+    # Calculate standard deviation of all columns
+    std_devs = df.std()
+
+    # Filter columns where standard deviation is not zero or the column name is 'Intercept'
+    cols_to_keep = std_devs[(std_devs != 0) | (std_devs.index == 'Intercept')].index
+
+    # Select only the columns that we want to keep in the DataFrame
+    filtered_df = df[cols_to_keep]
+
+    return filtered_df
 
 @dataclass
 class CategoricalAware:
@@ -74,6 +85,7 @@ class LinearRegression:
         self.labels, self.feature_array = model_matrix(formula, data=self.data)
 
         self.feature_array = self.feature_array[[column_of_interest] + [c for c in self.feature_array.columns if c != column_of_interest]]
+        self.feature_array = drop_zero_std_columns(self.feature_array)
         self.indices = self.feature_array.index  # Capture the indices of the rows retained in X
 
 
@@ -102,6 +114,7 @@ class LinearRegression:
         # Generate X_prime without the special categorical and intercept
         _, X_prime_df = model_matrix(modified_formula, data=self.data.loc[self.indices])
         X_prime_df = X_prime_df.drop(columns=['Intercept'], errors='ignore')  # Drop the intercept column if it exists
+        X_prime_df = drop_zero_std_columns(X_prime_df)
 
         # Add one-hot encoding of the special categorical column to X_prime
         cat_encoded = pd.get_dummies(self.data.loc[self.indices, self.special_categorical],

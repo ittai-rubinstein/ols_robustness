@@ -172,7 +172,7 @@ def ku_triangle_inequality(
     # We concat a 0 to each cumulative sum so that the 0 index of the cumulative sum represents a summation over 0 elements.
     best_u_contributions = np.concatenate((np.zeros((n, 1)), np.cumsum(np.sort(best_entries, axis=1)[:, ::-1], axis=1)), axis=1)
     best_kmu_contributions = np.concatenate((np.zeros((n, 1)), np.cumsum(np.sort(gram_matrix, axis=1)[:, ::-1], axis=1)), axis=1)
-
+    del gram_matrix
     # We now compute the total possible contribution of adding each possible sample to T, due to both its $u$ and
     # its $k-u$ inner products:
     sample_contributions = np.full((n, u_max, k_max), -np.inf)
@@ -180,6 +180,7 @@ def ku_triangle_inequality(
         min(u_max, k_max), desc="KU Triangle Inequality - combining contributions", disable=True
     ):
         sample_contributions[:, u, u:k_max] = best_u_contributions[:, u][:, np.newaxis] + best_kmu_contributions[:, :k_max - u]
+    del best_u_contributions
 
     if return_indices_uk is not None:
         indices = []
@@ -205,6 +206,7 @@ def ku_triangle_inequality(
 
     best_contributions = -np.sort(-best_contributions, axis=0)
     cumsum_best_contributions = np.cumsum(best_contributions, axis=0)
+    del best_contributions
     # Concatenate 0 so that 0 index corresponds to taking a summation of only 0 elements
     cumsum_best_contributions = np.concatenate((np.zeros((1, u_max, k_max)), cumsum_best_contributions), axis=0)
 

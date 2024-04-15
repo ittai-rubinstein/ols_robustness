@@ -44,6 +44,7 @@ class ParsedLinearRegression:
     root_Sigma: np.ndarray
     axis_of_interest: np.ndarray
     beta_e: float
+    beta_e_sign: float
     delta_beta_e: float
     num_samples: int
     dimension: tuple
@@ -103,6 +104,7 @@ class RobustnessAuditor:
         delta_beta_e = self.linear_regression.model.bse[self.linear_regression.column_of_interest]
 
         # If the sign of our fit was negative to begin with, then we want to bound removals that increase the fit value.
+        beta_e_sign = np.sign(beta_e)
         if beta_e < 0:
             beta_e = -beta_e
             R = -R
@@ -129,7 +131,7 @@ class RobustnessAuditor:
         # Store all parsed and computed data in the dataclass
         self.parsed_data = ParsedLinearRegression(
             R=R, Z=Z, X=X_normalized, Sigma=Sigma, root_Sigma=root_Sigma,
-            axis_of_interest=axis_of_interest_normalized, beta_e=beta_e, delta_beta_e=delta_beta_e,
+            axis_of_interest=axis_of_interest_normalized, beta_e=beta_e, beta_e_sign=beta_e_sign, delta_beta_e=delta_beta_e,
             num_samples=num_samples, dimension=(num_samples, dimension),
             XR=XR, XZ=XZ, linear_effects=linear_effects
         )
@@ -144,7 +146,7 @@ class RobustnessAuditor:
         :return:
         """
         self.log("Computing bounds on the covariance shift...")
-        X = self.parsed_data.X
+        X = self.parsed_data.X.astype(np.float32)
         self.covariance_shift = Problem1(
             gram_matrix= (X @ X.T)**2, params=self.config.problem_1_params
         )
@@ -156,7 +158,7 @@ class RobustnessAuditor:
 
     def compute_XR_bounds(self):
         self.log("Computing problem 1 bound on XR...")
-        XR = self.parsed_data.XR
+        XR = self.parsed_data.XR.astype(np.float32)
         self.XR_bounds = Problem1(
             gram_matrix=XR @ XR.T, params=self.config.problem_1_params
         )
@@ -168,7 +170,7 @@ class RobustnessAuditor:
 
     def compute_XZ_bounds(self):
         self.log("Computing problem 1 bound on XZ...")
-        XZ = self.parsed_data.XZ
+        XZ = self.parsed_data.XZ.astype(np.float32)
         self.XZ_bounds = Problem1(
             gram_matrix=XZ @ XZ.T, params=self.config.problem_1_params
         )
@@ -180,7 +182,7 @@ class RobustnessAuditor:
 
     def compute_XZR_bounds(self):
         self.log("Computing problem 1 bound on <e Sigma_T, sum_i X_i R_i>...")
-        XZ, XR = self.parsed_data.XZ, self.parsed_data.XR
+        XZ, XR = self.parsed_data.XZ.astype(np.float32), self.parsed_data.XR.astype(np.float32)
         asymmetric_matrix = XZ @ XR.T
         gram_matrix = (asymmetric_matrix + asymmetric_matrix.T)/ 2
         self.XZR_bounds = Problem1(
@@ -231,12 +233,7 @@ class RobustnessAuditor:
             config=self.config.lower_bounds_params
         )
 
-    def compute_all_bounds(self):
-        self.compute_covariance_shift()
-        self.compute_XR_bounds()
-        self.compute_XZ_bounds()
-        self.compute_XZR_bounds()
-        self.compute_linear_effect_bounds()
+    def compute_all_bounds(self, categorical_aware: bool = False):
 
         self.removal_effect_lower_bounds = RemovalEffectsLowerBound(
             X=self.parsed_data.X,
@@ -245,13 +242,24 @@ class RobustnessAuditor:
             config=self.config.lower_bounds_params
         )
 
+        if categorical_aware:
+            return self.compute_all_bounds_categorical()
+
+        self.compute_covariance_shift()
+        self.compute_XR_bounds()
+        self.compute_XZ_bounds()
+        self.compute_XZR_bounds()
+        self.compute_linear_effect_bounds()
+
         self.linear_effect = self.linear_effect_bounds.upper_bounds.combined_bound ** 2
         cs_term = self.covariance_shift.upper_bounds.combined_bound
         xz_term = self.XZ_bounds.upper_bounds.combined_bound
-        xr_term =  self.XR_bounds.upper_bounds.combined_bound
+        xr_term = self.XR_bounds.upper_bounds.combined_bound
         xzr_term = self.XZR_bounds.upper_bounds.combined_bound
-        self.upper_bound = self.linear_effect + (xzr_term**2) + ((cs_term * xr_term * xz_term) / (1 - cs_term))
+        self.upper_bound = self.linear_effect + (xzr_term ** 2) + ((cs_term * xr_term * xz_term) / (1 - cs_term))
         self._compute_k_singular()
+
+
 
 
     def compute_all_bounds_categorical(self):
@@ -306,6 +314,7 @@ class RobustnessAuditor:
         gram_matrix_CS = X @ X.transpose()
         ku_cs_data = KUData(gram_matrix=gram_matrix_CS ** 2, bucket_scores=averaging_effect_CS_bounds)
         ku_cs_bounds = compute_ku_bounds(ku_cs_data, ku_params)
+        del ku_cs_data, gram_matrix_CS
         covariance_shift_bound = extract_k_bounds(ku_cs_bounds)
 
 
@@ -315,15 +324,17 @@ class RobustnessAuditor:
         XR = X * residuals[:, np.newaxis]
         gram_matrix_XR = XR @ XR.transpose()
 
+        ku_xr_data = compute_ku_data(gram_matrix_XR, split_R, category_norm_bounds)
+        ku_xr_bounds = compute_ku_bounds(ku_xr_data, ku_params)
+        del ku_xr_data, gram_matrix_XR
+
         XZ = X * (X @ axis_of_interest_normalized)[:, np.newaxis]
         split_Z = [bucket @ axis_of_interest_normalized for bucket in split_X]
         gram_matrix_XZ = XZ @ XZ.transpose()
 
-        ku_xr_data = compute_ku_data(gram_matrix_XR, split_R, category_norm_bounds)
         ku_xe_data = compute_ku_data(gram_matrix_XZ, split_Z, category_norm_bounds)
-
-        ku_xr_bounds = compute_ku_bounds(ku_xr_data, ku_params)
         ku_xe_bounds = compute_ku_bounds(ku_xe_data, ku_params)
+        del ku_xe_data, gram_matrix_XZ
 
         xr_bound = extract_k_bounds(ku_xr_bounds)
         xe_bound = extract_k_bounds(ku_xe_bounds)
@@ -338,13 +349,21 @@ class RobustnessAuditor:
 
     def summary(self):
         self.upper_bound[self.upper_bound < 0] = np.inf
-        result = {}
+        result = {
+            "fit_value": self.parsed_data.beta_e * self.parsed_data.beta_e_sign,
+            "error_bar": self.parsed_data.delta_beta_e
+        }
         indices = np.arange(1, len(self.upper_bound)+1)
         result["Lower Bound"] = np.min(indices[self.upper_bound > self.parsed_data.beta_e])
         if self.removal_effect_lower_bounds.amip:
-            result["AMIP"] = np.min(indices[self.removal_effect_lower_bounds.amip.removal_effects > self.parsed_data.beta_e])
+            amip = self.removal_effect_lower_bounds.amip.removal_effects
+            result["AMIP"] = np.min(indices[:len(amip)][ amip > self.parsed_data.beta_e])
+
         if self.removal_effect_lower_bounds.kzcs21:
-            result["KZCS21"] = np.min(indices[self.removal_effect_lower_bounds.kzcs21.removal_effects > self.parsed_data.beta_e])
+            kzcs21 = self.removal_effect_lower_bounds.kzcs21.removal_effects
+            result["KZCS21"] = np.min(indices[:len(kzcs21)][kzcs21 > self.parsed_data.beta_e])
+
+        return result
 
     def plot_removal_effects(self):
         self._compute_k_singular()
@@ -369,6 +388,9 @@ class RobustnessAuditor:
         if self.removal_effect_lower_bounds.kzcs21:
             ax.plot(k_vals[:len(self.removal_effect_lower_bounds.kzcs21.removal_effects)],
                     self.removal_effect_lower_bounds.kzcs21.removal_effects, 'r-.', label='KZCS21 Lower Bound')
+        if self.removal_effect_lower_bounds.triple_greedy:
+            ax.plot(k_vals[:len(self.removal_effect_lower_bounds.triple_greedy.removal_effects)],
+                    self.removal_effect_lower_bounds.triple_greedy.removal_effects, 'r:', label='Triple Greedy Lower Bound')
 
         ax.axhline(y=self.parsed_data.beta_e, color='black', label=r'$<\beta, e>$')
 
