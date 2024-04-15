@@ -6,13 +6,29 @@ from statsmodels.regression.linear_model import RegressionResultsWrapper
 from formulaic import model_matrix
 from typing import List, Optional, Any
 
+from src.categorical_data.categorical_data import split_and_normalize, perform_regression_and_append_residuals, \
+    normalize_and_split_dataframes
+
 
 @dataclass
 class CategoricalAware:
-    column_name: str
-    split_X: List[np.ndarray] = field(default_factory=list)
-    split_R: List[np.ndarray] = field(default_factory=list)
-    split_Z: List[np.ndarray] = field(default_factory=list)
+    beta_e: float
+    beta_e_sign: int
+    X: np.ndarray
+    residuals: np.ndarray
+    axis_of_interest_normalized: np.ndarray
+    num_samples: int
+    dimension: int
+    split_X: List[np.ndarray]
+    split_R: List[np.ndarray]
+
+
+# @dataclass
+# class CategoricalAware:
+#     column_name: str
+#     split_X: List[np.ndarray] = field(default_factory=list)
+#     split_R: List[np.ndarray] = field(default_factory=list)
+#     split_Z: List[np.ndarray] = field(default_factory=list)
 
 @dataclass
 class RegressionArrays:
@@ -74,32 +90,58 @@ class LinearRegression:
         )
 
         if self.special_categorical:
-            assert f'C({self.special_categorical})' in formula, "The special categorical column must be included in the formula."
-            # Modify the formula to exclude the categorical and intercept
-            modified_formula = formula.replace(f'C({self.special_categorical}) +', '').replace(
-                f'+ C({self.special_categorical})', '').replace(f'C({self.special_categorical})', '') + ' - 1'
-            _, X_prime = model_matrix(modified_formula, data=self.data.loc[self.indices])
-            X_prime = X_prime.values
+            self._extract_categorical_aware()
 
-            # Fetching unique categories from the filtered data
-            categories = self.data.loc[self.indices, self.special_categorical].unique()
-            split_X, split_R, split_Z = [], [], []
-            for category in categories:
-                category_indices = self.data.loc[self.indices, self.special_categorical] == category
-                split_X.append(X_prime[category_indices, :])
-                split_R.append(self.residuals[category_indices])
-                split_Z.append(self.Z[category_indices])
+    def _extract_categorical_aware(self):
+        assert f'C({self.special_categorical})' in self.formula, "The special categorical column must be included in the formula."
 
-            # Storing categorical splits in a structured dataclass
-            self.categorical_aware = CategoricalAware(
-                column_name=self.special_categorical,
-                split_X=split_X,
-                split_R=split_R,
-                split_Z=split_Z
-            )
+        # Remove the intercept and categorical variable from the formula
+        modified_formula = self.formula.replace(f'C({self.special_categorical}) +', '').replace(
+            f'+ C({self.special_categorical})', '').replace(f'C({self.special_categorical})', '') + ' - 1'
 
-            self.categorical_aware = CategoricalAware(column_name=self.special_categorical, split_X=split_X,
-                                                      split_R=split_R, split_Z=split_Z)
+        # Generate X_prime without the special categorical and intercept
+        _, X_prime_df = model_matrix(modified_formula, data=self.data.loc[self.indices])
+        X_prime_df = X_prime_df.drop(columns=['Intercept'], errors='ignore')  # Drop the intercept column if it exists
+
+        # Add one-hot encoding of the special categorical column to X_prime
+        cat_encoded = pd.get_dummies(self.data.loc[self.indices, self.special_categorical],
+                                     prefix=self.special_categorical)
+        df = pd.concat([X_prime_df, cat_encoded], axis=1)
+
+        # Extract the label column to the DataFrame
+        label = self.formula.split("~")[0].strip()
+        df[label] = self.data.loc[self.indices, label]
+
+        # Split and normalize the DataFrame based on the categorical columns
+        bucket_dfs = split_and_normalize(df, list(cat_encoded.columns))
+
+        # Perform linear regression and append residuals
+        coefficients = perform_regression_and_append_residuals(bucket_dfs, label)
+        beta_e = np.abs(coefficients[self.column_of_interest])
+        beta_e_sign = np.sign(coefficients[self.column_of_interest])
+
+        # Normalize data and extract numpy arrays
+        split_X, split_R, axis_of_interest_normalized = normalize_and_split_dataframes(
+            bucket_dfs,
+            self.column_of_interest,
+            sign=beta_e_sign
+        )
+        X = np.vstack(split_X)
+        residuals = np.concatenate(split_R)
+        num_samples, dimension = X.shape
+
+        # Store results in CategoricalAware
+        self.categorical_aware = CategoricalAware(
+            beta_e=beta_e,
+            beta_e_sign=beta_e_sign,
+            X=X,
+            residuals=residuals,
+            axis_of_interest_normalized=axis_of_interest_normalized,
+            num_samples=num_samples,
+            dimension=dimension,
+            split_X=split_X,
+            split_R=split_R
+        )
 
 # Example usage:
 # df = pd.read_csv('your_data.csv')

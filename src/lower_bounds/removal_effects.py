@@ -30,6 +30,8 @@ class RemovalEffectsLowerBound:
     ):
         self._config = config
         if config.run_amip:
+            if config.verbose:
+                print("Computing the AMIP Lower Bound...")
             amip_order, _ = approximate_most_influential_pertrubation(
                 X, R, axis_of_interest
             )

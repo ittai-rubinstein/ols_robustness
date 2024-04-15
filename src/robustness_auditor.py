@@ -1,9 +1,17 @@
 from pathlib import Path
+from typing import Optional, List
 
 import numpy as np
 import scipy.linalg
 from dataclasses import dataclass, field
 
+from matplotlib import pyplot as plt
+
+from src.categorical_data.categorical_data import compute_bounds_for_all
+from src.categorical_data.dynamic_programming import dynamic_programming_1d
+from src.categorical_data.ku_triangle_inequality import KUMetadata, KUData, compute_ku_bounds, extract_k_bounds
+from src.geometric_algorithms.spectral_algorithms import spectral_bound_sum_ips
+from src.geometric_algorithms.triangle_inequality import refined_triangle_inequality_ips
 from src.problem_1 import Problem1, Problem1Params
 from src.lower_bounds.removal_effects import LowerBoundConfig, RemovalEffectsLowerBound
 from src.utils.linear_regression import LinearRegression
@@ -23,6 +31,7 @@ class AuditorConfig:
     problem_1_params: Problem1Params = field(default_factory=Problem1Params)
     verbose: int = 2
     lower_bounds_params: LowerBoundConfig = field(default_factory=LowerBoundConfig)
+    compute_freund_hopkins: bool = False
 
 
 
@@ -43,6 +52,24 @@ class ParsedLinearRegression:
     linear_effects: np.ndarray
 
 
+def compute_ku_data(gram_matrix: np.ndarray, split_factors: List[np.ndarray], category_norm_bounds):
+    highest_factor_averages = [
+        np.concatenate((np.zeros(1), np.maximum(
+            np.abs(np.cumsum(np.sort(factor_bucket))), np.abs(np.cumsum(np.sort(factor_bucket)[::-1]))
+        ) / np.arange(1, len(factor_bucket) + 1))) for factor_bucket in split_factors
+    ]
+    averaging_effect_bounds = [
+        hfa[::-1] * cnb for hfa, cnb in zip(highest_factor_averages, category_norm_bounds)
+    ]
+    return KUData(gram_matrix=gram_matrix, bucket_scores=averaging_effect_bounds)
+
+@dataclass
+class CategoricalUpperBounds:
+    cs_bound: np.array
+    xe_bound: np.array
+    xr_bound: np.array
+    direct_effect_bounds: np.ndarray
+
 class RobustnessAuditor:
     linear_regression: LinearRegression
     config: AuditorConfig
@@ -57,6 +84,8 @@ class RobustnessAuditor:
     upper_bound: np.ndarray
     linear_effect: np.ndarray
     removal_effect_lower_bounds: RemovalEffectsLowerBound
+    freund_and_hopkins_upper_bound: Optional[np.ndarray] = None
+    categorical_upper_bounds: Optional[CategoricalUpperBounds] = None
 
     def __init__(self, linear_regression: LinearRegression, config: AuditorConfig):
         self.linear_regression = linear_regression
@@ -68,6 +97,15 @@ class RobustnessAuditor:
         X = self.linear_regression.regression_arrays.X
         R = self.linear_regression.regression_arrays.R
         num_samples, dimension = X.shape
+
+        # Access the fit coefficient and its standard error for the column of interest
+        beta_e = self.linear_regression.model.params[self.linear_regression.column_of_interest]
+        delta_beta_e = self.linear_regression.model.bse[self.linear_regression.column_of_interest]
+
+        # If the sign of our fit was negative to begin with, then we want to bound removals that increase the fit value.
+        if beta_e < 0:
+            beta_e = -beta_e
+            R = -R
 
         # Reaverage X if the config flag is set
         if self.config.reaverage:
@@ -83,13 +121,10 @@ class RobustnessAuditor:
         Z = X_normalized @ axis_of_interest_normalized
 
         # Compute additional members
-        XR = R[:, np.newaxis] * X
-        XZ = Z[:, np.newaxis] * X
+        XR = R[:, np.newaxis] * X_normalized
+        XZ = Z[:, np.newaxis] * X_normalized
         linear_effects = XR @ axis_of_interest_normalized
 
-        # Access the fit coefficient and its standard error for the column of interest
-        beta_e = self.linear_regression.model.params[self.linear_regression.column_of_interest]
-        delta_beta_e = self.linear_regression.model.bse[self.linear_regression.column_of_interest]
 
         # Store all parsed and computed data in the dataclass
         self.parsed_data = ParsedLinearRegression(
@@ -113,7 +148,6 @@ class RobustnessAuditor:
         self.covariance_shift = Problem1(
             gram_matrix= (X @ X.T)**2, params=self.config.problem_1_params
         )
-        self._compute_k_singular()
         if self.config.verbose >= 2:
             self.log("Plotting results...")
             ax = self.covariance_shift.plot_bounds()
@@ -176,11 +210,9 @@ class RobustnessAuditor:
 
         :return: The smallest index k (1-based index) or 0 if no such k exists.
         """
-        # Get the combined upper bounds from the problem instance
-        combined_bounds = self.covariance_shift.upper_bounds.combined_bound
 
         # Find the first index where the bound is >= 1
-        k_indices = np.where(combined_bounds >= 1)[0]
+        k_indices = np.where(self.upper_bound < 0)[0]
 
         if k_indices.size > 0:
             self.k_singular =  k_indices[0] + 1  # Return 1-based index
@@ -206,9 +238,154 @@ class RobustnessAuditor:
         self.compute_XZR_bounds()
         self.compute_linear_effect_bounds()
 
+        self.removal_effect_lower_bounds = RemovalEffectsLowerBound(
+            X=self.parsed_data.X,
+            R=self.parsed_data.R,
+            axis_of_interest=self.parsed_data.axis_of_interest,
+            config=self.config.lower_bounds_params
+        )
+
         self.linear_effect = self.linear_effect_bounds.upper_bounds.combined_bound ** 2
         cs_term = self.covariance_shift.upper_bounds.combined_bound
         xz_term = self.XZ_bounds.upper_bounds.combined_bound
         xr_term =  self.XR_bounds.upper_bounds.combined_bound
         xzr_term = self.XZR_bounds.upper_bounds.combined_bound
-        self.upper_bound = self.linear_effect + xzr_term + ((cs_term * xr_term * xz_term) / (1 - cs_term))
+        self.upper_bound = self.linear_effect + (xzr_term**2) + ((cs_term * xr_term * xz_term) / (1 - cs_term))
+        self._compute_k_singular()
+
+
+    def compute_all_bounds_categorical(self):
+        assert self.linear_regression.categorical_aware is not None
+
+        # Extract information about the linear regression from the relevant field of self:
+        split_X = self.linear_regression.categorical_aware.split_X
+        split_R = self.linear_regression.categorical_aware.split_R
+        X = np.vstack(split_X)
+        residuals = np.concatenate(split_R)
+        num_samples, dimension = X.shape
+        axis_of_interest_normalized = self.linear_regression.categorical_aware.axis_of_interest_normalized
+
+        # Set the high-level parameters for the ku bounds that we will use later on.
+        ku_params = KUMetadata(k_max=num_samples // 10 + 1, u_max=len(split_X) + 1,
+                               bucket_sizes=[len(sr) for sr in split_R])
+
+        # Step 1: Compute bounds on the direct effects of removals for the categorical data:
+
+        # Compute a mapping from bucket index to upper bounds on its direct influences as a function of the number of samples removed from it:
+        bounds_list = compute_bounds_for_all(
+            split_X, split_R, axis_of_interest_normalized
+        )
+        # Use a dynamic programming algorithm to solve the integer knapsack to maximize the total direct influences
+        total_score_bounds = dynamic_programming_1d(bounds_list, num_samples // 10 + 1)[1:]
+
+        # Step 2: Bound the categorical aware covariance shift phenomena
+
+        # These are bounds on the norm of the sum of any $k$ members of any bucket:
+        category_norm_bounds = [
+            refined_triangle_inequality_ips(bucket @ bucket.T, verbose=False)
+            for bucket in split_X
+        ]
+        # In sum ips functions, we do not include the options for 0 or n removals
+        category_norm_bounds = [
+            np.concatenate([[0], category_norm_bound, [0]]) for category_norm_bound in category_norm_bounds
+        ]
+        # This probably won't change too much, but we can use the fact that the sum over all samples in a bucket is always 0, so max norm sum over k samples == max norm sum over n-k samples.
+        category_norm_bounds = [
+            np.minimum(category_norm_bound, category_norm_bound[::-1]) for category_norm_bound in category_norm_bounds
+        ]
+        averaging_effect_CS_bounds = [
+            (category_norm_bound[:-1] ** 2) / (len(category_norm_bound) - 1 - np.arange(len(category_norm_bound) - 1))
+            for category_norm_bound in category_norm_bounds
+        ]
+        averaging_effect_CS_bounds = [
+            np.concatenate((averaging_effect_CS_bound, np.zeros(1))) for averaging_effect_CS_bound in
+            averaging_effect_CS_bounds
+        ]
+
+        # Compute bounds on the covariance shift and problem 1s as with any dataset.
+        gram_matrix_CS = X @ X.transpose()
+        ku_cs_data = KUData(gram_matrix=gram_matrix_CS ** 2, bucket_scores=averaging_effect_CS_bounds)
+        ku_cs_bounds = compute_ku_bounds(ku_cs_data, ku_params)
+        covariance_shift_bound = extract_k_bounds(ku_cs_bounds)
+
+
+        # Step 3: Compute categorical problem 1 bounds on XR and XZ
+
+        # Generate a version of the Xe and XR arrays tailored to the categorical dataset
+        XR = X * residuals[:, np.newaxis]
+        gram_matrix_XR = XR @ XR.transpose()
+
+        XZ = X * (X @ axis_of_interest_normalized)[:, np.newaxis]
+        split_Z = [bucket @ axis_of_interest_normalized for bucket in split_X]
+        gram_matrix_XZ = XZ @ XZ.transpose()
+
+        ku_xr_data = compute_ku_data(gram_matrix_XR, split_R, category_norm_bounds)
+        ku_xe_data = compute_ku_data(gram_matrix_XZ, split_Z, category_norm_bounds)
+
+        ku_xr_bounds = compute_ku_bounds(ku_xr_data, ku_params)
+        ku_xe_bounds = compute_ku_bounds(ku_xe_data, ku_params)
+
+        xr_bound = extract_k_bounds(ku_xr_bounds)
+        xe_bound = extract_k_bounds(ku_xe_bounds)
+
+        self.categorical_upper_bounds = CategoricalUpperBounds(
+            direct_effect_bounds=total_score_bounds,
+            cs_bound=covariance_shift_bound,
+            xe_bound=xe_bound,
+            xr_bound=xr_bound
+        )
+        self.upper_bound = total_score_bounds + (xe_bound * xr_bound / (1 - covariance_shift_bound))
+
+    def summary(self):
+        self.upper_bound[self.upper_bound < 0] = np.inf
+        result = {}
+        indices = np.arange(1, len(self.upper_bound)+1)
+        result["Lower Bound"] = np.min(indices[self.upper_bound > self.parsed_data.beta_e])
+        if self.removal_effect_lower_bounds.amip:
+            result["AMIP"] = np.min(indices[self.removal_effect_lower_bounds.amip.removal_effects > self.parsed_data.beta_e])
+        if self.removal_effect_lower_bounds.kzcs21:
+            result["KZCS21"] = np.min(indices[self.removal_effect_lower_bounds.kzcs21.removal_effects > self.parsed_data.beta_e])
+
+    def plot_removal_effects(self):
+        self._compute_k_singular()
+        k_vals = np.arange(1, len(self.upper_bound) + 1)
+        self.upper_bound[self.upper_bound < 0] = np.inf
+
+        fig, ax = plt.subplots()
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+        ax.grid(True, which="both", linestyle='-', linewidth='0.5', color='grey')
+        ax.grid(True, which="minor", linestyle='--')
+
+        # Plotting bounds
+        ax.plot(k_vals[:self.k_singular+1], self.upper_bound[:self.k_singular+1], 'b-', label='Upper Bound')
+        if self.freund_and_hopkins_upper_bound is not None:
+            ax.plot(k_vals, self.freund_and_hopkins_upper_bound, 'g-', label='Freund & Hopkins')
+
+        # Plotting lower bounds
+        if self.removal_effect_lower_bounds.amip:
+            ax.plot(k_vals[:len(self.removal_effect_lower_bounds.amip.removal_effects)],
+                    self.removal_effect_lower_bounds.amip.removal_effects, 'r--', label='AMIP Lower Bound')
+        if self.removal_effect_lower_bounds.kzcs21:
+            ax.plot(k_vals[:len(self.removal_effect_lower_bounds.kzcs21.removal_effects)],
+                    self.removal_effect_lower_bounds.kzcs21.removal_effects, 'r-.', label='KZCS21 Lower Bound')
+
+        ax.axhline(y=self.parsed_data.beta_e, color='black', label=r'$<\beta, e>$')
+
+        # Calculate the desired upper y-limit
+        upper_y_limit = self.parsed_data.beta_e + 10 * self.parsed_data.delta_beta_e
+        ylim = ax.get_ylim()
+        ax.set_ylim(bottom=None, top=min(ylim[1], upper_y_limit))
+
+        # Legend, labels, and layout
+        ax.legend()
+        ax.set_xlabel('Number of Samples Removed (k)')
+        ax.set_ylabel('Removal Effect Estimates')
+        fig.tight_layout()
+
+        # Save the figure
+        output_file = Path(self.config.output_dir) / "removal_effects_plot.png"
+        fig.savefig(output_file)
+
+        # Return the axes for further manipulation if necessary
+        return ax
