@@ -97,8 +97,8 @@ class RobustnessAuditor:
 
     def _parse_regression(self):
         # Extract matrices from linear regression instance
-        X = self.linear_regression.regression_arrays.X
-        R = self.linear_regression.regression_arrays.R
+        X = np.array(self.linear_regression.regression_arrays.X)
+        R = np.array(self.linear_regression.regression_arrays.R)
         num_samples, dimension = X.shape
 
         # Access the fit coefficient and its standard error for the column of interest

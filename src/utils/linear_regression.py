@@ -110,7 +110,7 @@ class LinearRegression:
             sqrt_weights = np.sqrt(weights)
             self.feature_array = self.feature_array.multiply(sqrt_weights, axis=0)
             # self.labels = self.labels.multiply(sqrt_weights)
-            self.residuals = self.residuals * sqrt_weights
+            self.residuals = np.array(self.residuals * sqrt_weights)
 
 
 
