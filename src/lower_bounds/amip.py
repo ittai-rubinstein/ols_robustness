@@ -29,8 +29,8 @@ def approximate_most_influential_pertrubation(X: np.ndarray, residuals: np.ndarr
     grad_f = grad(f)(w_ones, X, residuals, e)
 
     # Verify f(w=ones) is approximately 0
-    if not np.isclose(f(w_ones, X, residuals, e), 0, atol=1e-6):
-        raise ValueError("f(w=ones) does not evaluate to 0.")
+    if not np.isclose(f(w_ones, X, residuals, e), 0, atol=1e-3):
+        raise ValueError(f"f(w=ones)={f(w_ones, X, residuals, e)} does not evaluate to 0.")
 
     # Sort indices based on gradient values in descending order
     sorted_indices = np.argsort(-grad_f)

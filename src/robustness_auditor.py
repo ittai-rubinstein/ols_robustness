@@ -17,7 +17,7 @@ from src.problem_1 import Problem1, Problem1Params
 from src.lower_bounds.removal_effects import LowerBoundConfig, RemovalEffectsLowerBound
 from src.utils.linear_regression import LinearRegression
 
-
+SWITCH_TO_FLOAT32 = False
 # @dataclass
 # class Problem1Params:
 #     use_triangle_inequality: bool = True
@@ -148,7 +148,9 @@ class RobustnessAuditor:
         :return:
         """
         self.log("Computing bounds on the covariance shift...")
-        X = self.parsed_data.X.astype(np.float32)
+        X = self.parsed_data.X
+        if SWITCH_TO_FLOAT32:
+            X = X.astype(np.float32)
         self.covariance_shift = Problem1(
             gram_matrix= (X @ X.T)**2, params=self.config.problem_1_params
         )
@@ -160,7 +162,9 @@ class RobustnessAuditor:
 
     def compute_XR_bounds(self):
         self.log("Computing problem 1 bound on XR...")
-        XR = self.parsed_data.XR.astype(np.float32)
+        XR = self.parsed_data.XR
+        if SWITCH_TO_FLOAT32:
+            XR = XR.astype(np.float32)
         self.XR_bounds = Problem1(
             gram_matrix=XR @ XR.T, params=self.config.problem_1_params
         )
@@ -172,7 +176,9 @@ class RobustnessAuditor:
 
     def compute_XZ_bounds(self):
         self.log("Computing problem 1 bound on XZ...")
-        XZ = self.parsed_data.XZ.astype(np.float32)
+        XZ = self.parsed_data.XZ
+        if SWITCH_TO_FLOAT32:
+            XZ = XZ.astype(np.float32)
         self.XZ_bounds = Problem1(
             gram_matrix=XZ @ XZ.T, params=self.config.problem_1_params
         )
@@ -184,7 +190,11 @@ class RobustnessAuditor:
 
     def compute_XZR_bounds(self):
         self.log("Computing problem 1 bound on <e Sigma_T, sum_i X_i R_i>...")
-        XZ, XR = self.parsed_data.XZ.astype(np.float32), self.parsed_data.XR.astype(np.float32)
+        XZ = self.parsed_data.XZ
+        XR = self.parsed_data.XR
+        if SWITCH_TO_FLOAT32:
+            XZ = XZ.astype(np.float32)
+            XR = XR.astype(np.float32)
         asymmetric_matrix = XZ @ XR.T
         gram_matrix = (asymmetric_matrix + asymmetric_matrix.T)/ 2
         self.XZR_bounds = Problem1(
