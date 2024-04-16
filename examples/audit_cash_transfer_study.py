@@ -7,7 +7,7 @@ from data.angelucci_degiorgi_data import load_angelucci_data
 
 datasets = load_angelucci_data(1)
 
-CURRENT_DIR = Path(__file__).resolve()
+CURRENT_DIR = Path(__file__).resolve().parent
 base_dir = CURRENT_DIR / "results" / "cash_transfers"
 results = []
 for dataset in datasets:
