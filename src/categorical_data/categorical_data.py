@@ -42,7 +42,7 @@ def split_and_normalize(
 def perform_regression_and_append_residuals(
         split_dfs: List[pd.DataFrame],
         label: str,
-        verbose: bool = True
+        verbose: bool = False
 ) -> Dict[str, float]:
     """
     Perform linear regression on the combined dataframe, append residuals to each split dataframe in-place,

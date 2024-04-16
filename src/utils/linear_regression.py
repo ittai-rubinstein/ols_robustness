@@ -68,8 +68,6 @@ class LinearRegression:
     def __init__(self, data: pd.DataFrame, formula: str, column_of_interest: str = None,
                  special_categorical: str = None, weight: Optional[str] = None,
                  hc1_cluster: Optional[str] = None):
-        print(f"{formula=}")
-        print(f"{data.shape=}")
         self.data = data
         self.formula = formula
         self.weight = weight
@@ -86,22 +84,17 @@ class LinearRegression:
         self.special_categorical = special_categorical
 
         # Perform regression using statsmodels
+        if self.weight:
+            model = smf.wls(formula=self.formula, data=self.data, weights=self.data[self.weight])
+        else:
+            model = smf.ols(formula=self.formula, data=self.data)
         if self.hc1_cluster:
-            self.model = smf.ols(
-                formula=self.formula, data=self.data,
-                weights=self.data[self.weight] if self.weight else None
-            ).fit(
+            self.model = model.fit(
                 cov_type="cluster",
-                cov_kwds={'groups': self.data[self.hc1_cluster] - self.data[self.hc1_cluster].min()},
-                weights=self.data[self.weight] if self.weight else None
+                cov_kwds={'groups': self.data[self.hc1_cluster] - self.data[self.hc1_cluster].min()}
             )
         else:
-            self.model = smf.ols(
-                formula=self.formula, data=self.data,
-                weights=self.data[self.weight] if self.weight else None
-            ).fit(
-                weights=self.data[self.weight] if self.weight else None
-            )
+            self.model = model.fit()
         self.residuals = self.model.resid.values  # np.ndarray of residuals
 
         # Extract X and Y using formulaic

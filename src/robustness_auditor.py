@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from typing import Optional, List
 
@@ -91,6 +92,7 @@ class RobustnessAuditor:
     def __init__(self, linear_regression: LinearRegression, config: AuditorConfig):
         self.linear_regression = linear_regression
         self.config = config
+        os.makedirs(self.config.output_dir, exist_ok=True)
         self._parse_regression()
 
     def _parse_regression(self):

@@ -48,15 +48,15 @@ def load_ohie_regressions(iv: bool = False) -> List[NamedRegression]:
 
     res = []
     for label in tqdm.tqdm(labels):
-        outcome_regression = LinearRegression(
-            data=data.dropna(subset=[label]),
-            formula=label + " ~ " + "+".join([instrument] + controls) + "-1",
-            weight=weight,
-            hc1_cluster=cluster
-        )
         if iv:
+            outcome_regression = LinearRegression(
+                data=data.dropna(subset=[label, endogenous]),
+                formula=label + " ~ " + "+".join([instrument] + controls) + "-1",
+                weight=weight,
+                hc1_cluster=cluster
+            )
             endogenous_regression = LinearRegression(
-                data=data.dropna(subset=[endogenous]),
+                data=data.dropna(subset=[endogenous, label]),
                 formula=endogenous + " ~ " + "+".join([instrument] + controls) + "-1",
                 weight=weight,
                 hc1_cluster=cluster
@@ -66,6 +66,12 @@ def load_ohie_regressions(iv: bool = False) -> List[NamedRegression]:
                 regression=IVRegression(outcome_regression=outcome_regression, endogenous_regression=endogenous_regression)
             ))
         else:
+            outcome_regression = LinearRegression(
+                data=data.dropna(subset=[label]),
+                formula=label + " ~ " + "+".join([instrument] + controls) + "-1",
+                weight=weight,
+                hc1_cluster=cluster
+            )
             res.append(NamedRegression(
                 name=label,
                 regression=outcome_regression
