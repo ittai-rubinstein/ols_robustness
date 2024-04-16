@@ -48,24 +48,32 @@ class RegressionArrays:
     Z: np.ndarray
     R: np.ndarray
 
+
 class LinearRegression:
     data: pd.DataFrame
     formula: str
+    hc1_cluster: Optional[str]
+    weight: Optional[str]
     column_of_interest: str
     special_categorical: Optional[str]
     regression_arrays: RegressionArrays
     model: RegressionResultsWrapper
     residuals: np.ndarray
     feature_array: pd.DataFrame
-    labels: pd.Series
+    # labels: pd.Series
     Z: pd.Series
     # axis_of_interest: np.ndarray
     categorical_aware: Optional[CategoricalAware] = None
 
     def __init__(self, data: pd.DataFrame, formula: str, column_of_interest: str = None,
-                 special_categorical: str = None):
+                 special_categorical: str = None, weight: Optional[str] = None,
+                 hc1_cluster: Optional[str] = None):
+        print(f"{formula=}")
+        print(f"{data.shape=}")
         self.data = data
         self.formula = formula
+        self.weight = weight
+        self.hc1_cluster = hc1_cluster
 
         # Extract the first feature from the formula
         features_part = formula.split('~')[1].strip()
@@ -78,15 +86,40 @@ class LinearRegression:
         self.special_categorical = special_categorical
 
         # Perform regression using statsmodels
-        self.model = smf.ols(formula=self.formula, data=self.data).fit()
+        if self.hc1_cluster:
+            self.model = smf.ols(
+                formula=self.formula, data=self.data,
+                weights=self.data[self.weight] if self.weight else None
+            ).fit(
+                cov_type="cluster",
+                cov_kwds={'groups': self.data[self.hc1_cluster] - self.data[self.hc1_cluster].min()},
+                weights=self.data[self.weight] if self.weight else None
+            )
+        else:
+            self.model = smf.ols(
+                formula=self.formula, data=self.data,
+                weights=self.data[self.weight] if self.weight else None
+            ).fit(
+                weights=self.data[self.weight] if self.weight else None
+            )
         self.residuals = self.model.resid.values  # np.ndarray of residuals
 
         # Extract X and Y using formulaic
-        self.labels, self.feature_array = model_matrix(formula, data=self.data)
-
-        self.feature_array = self.feature_array[[column_of_interest] + [c for c in self.feature_array.columns if c != column_of_interest]]
+        _, self.feature_array = model_matrix(formula, data=self.data)
+        self.feature_array = self.feature_array[
+            [column_of_interest] + [c for c in self.feature_array.columns if c != column_of_interest]]
         self.feature_array = drop_zero_std_columns(self.feature_array)
         self.indices = self.feature_array.index  # Capture the indices of the rows retained in X
+
+        # Apply weights manually to the features and labels if weights are specified
+        if self.weight:
+            weights = self.data.loc[self.indices, self.weight]  # Directly use the indices to slice weights
+            sqrt_weights = np.sqrt(weights)
+            self.feature_array = self.feature_array.multiply(sqrt_weights, axis=0)
+            # self.labels = self.labels.multiply(sqrt_weights)
+            self.residuals = self.residuals * sqrt_weights
+
+
 
 
         # # Ensure the column of interest is the first column in X
@@ -97,7 +130,7 @@ class LinearRegression:
         self.Z = self.feature_array[column_of_interest]  # First column is now the column of interest
 
         self.regression_arrays = RegressionArrays(
-            X=self.feature_array.drop(columns='Intercept').to_numpy(),
+            X=self.feature_array.drop(columns=['Intercept'], errors='ignore').to_numpy(),
             R=self.residuals, Z=self.Z.to_numpy()
         )
 
@@ -115,6 +148,11 @@ class LinearRegression:
         _, X_prime_df = model_matrix(modified_formula, data=self.data.loc[self.indices])
         X_prime_df = X_prime_df.drop(columns=['Intercept'], errors='ignore')  # Drop the intercept column if it exists
         X_prime_df = drop_zero_std_columns(X_prime_df)
+
+        # Apply weights similarly
+        if self.weight:
+            sub_weights = self.data.loc[self.indices, self.weight]  # Directly use the same indices to slice weights
+            X_prime_df = X_prime_df.multiply(np.sqrt(sub_weights), axis=0)
 
         # Add one-hot encoding of the special categorical column to X_prime
         cat_encoded = pd.get_dummies(self.data.loc[self.indices, self.special_categorical],
