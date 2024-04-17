@@ -177,7 +177,7 @@ class RemovalEffectsLowerBound:
             self.triple_greedy = triple_greedy(X, R, axis_of_interest, config.verbose)
         if config.run_single_greedy:
             if config.verbose:
-                print("Computing the Triple Greedy Lower Bound...")
+                print("Computing the Greedy Lower Bound...")
             self.single_greedy = single_greedy(X, R, axis_of_interest, config.verbose)
         if config.run_amip:
             if config.verbose:
