@@ -369,7 +369,16 @@ class RobustnessAuditor:
         result["Lower Bound"] = np.min(indices[self.upper_bound > self.parsed_data.beta_e])
         if self.removal_effect_lower_bounds.amip:
             amip = self.removal_effect_lower_bounds.amip.removal_effects
-            result["AMIP"] = np.min(indices[:len(amip)][ amip > self.parsed_data.beta_e])
+            result["AMIP"] = np.min(indices[:len(amip)][amip > self.parsed_data.beta_e])
+
+        if self.removal_effect_lower_bounds.single_greedy:
+            single_greedy = self.removal_effect_lower_bounds.single_greedy.removal_effects
+            result["Greedy"] = np.min(indices[:len(single_greedy)][single_greedy > self.parsed_data.beta_e])
+
+        if self.removal_effect_lower_bounds.triple_greedy:
+            triple_greedy = self.removal_effect_lower_bounds.single_greedy.removal_effects
+            result["Triple Greedy"] = np.min(indices[:len(triple_greedy)][ triple_greedy > self.parsed_data.beta_e])
+
 
         if self.removal_effect_lower_bounds.kzcs21:
             kzcs21 = self.removal_effect_lower_bounds.kzcs21.removal_effects
@@ -402,7 +411,10 @@ class RobustnessAuditor:
                     self.removal_effect_lower_bounds.kzcs21.removal_effects, 'r-.', label='KZCS21 Lower Bound')
         if self.removal_effect_lower_bounds.triple_greedy:
             ax.plot(k_vals[:len(self.removal_effect_lower_bounds.triple_greedy.removal_effects)],
-                    self.removal_effect_lower_bounds.triple_greedy.removal_effects, 'r:', label='Triple Greedy Lower Bound')
+                    self.removal_effect_lower_bounds.triple_greedy.removal_effects, 'r-', label='Triple Greedy Lower Bound')
+        if self.removal_effect_lower_bounds.single_greedy:
+            ax.plot(k_vals[:len(self.removal_effect_lower_bounds.single_greedy.removal_effects)],
+                    self.removal_effect_lower_bounds.single_greedy.removal_effects, 'r:', label=r'Greedy $\left \langle \Sigma_T e, \sum_{i \in T} X_i R_i \right \rangle$ Lower Bound')
 
         ax.axhline(y=self.parsed_data.beta_e, color='black', label=r'$<\beta, e>$')
 

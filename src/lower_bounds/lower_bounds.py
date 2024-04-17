@@ -149,7 +149,7 @@ def compute_removal_effects(
     Returns:
     - ndarray: An array of scores corresponding to each k in k_vals.
     """
-    if normalized:
+    if normalized or np.allclose(X @ X.T, np.eye(X.shape[0])):
         norm_X = X
     else:
         Sigma = X.T @ X

@@ -16,6 +16,7 @@ class LowerBoundConfig:
     run_amip: bool = True
     run_kzcs21: bool = False
     verbose: bool = True
+    run_single_greedy: bool = True
 
 
 import numpy as np
@@ -88,14 +89,44 @@ class LowerBoundResult:
     removal_effects: np.ndarray
     removal_sets: List[List[int]]
 
-
-def triple_greedy(X: np.ndarray, R: np.ndarray, axis_of_interest: np.ndarray, print_tqdm:bool = True) -> LowerBoundResult:
-    n, d = X.shape
+def compute_eSigmaXR_gram_matrix(X: np.ndarray, R: np.ndarray, axis_of_interest: np.ndarray) -> np.ndarray:
+    """
+    The value of <Sigma_T e , sum_{i in T} X_i R_i> can be reduced to a problem 1 with a special Gram matrix.
+    This function computes that Gram matrix.
+    :param X:
+    :param R:
+    :param axis_of_interest:
+    :return:
+    """
     Z = X @ axis_of_interest
     XZ = X * Z[:, np.newaxis]
     XR = X * R[:, np.newaxis]
     asymmetric_matrix = XZ @ XR.T
     gram_matrix = (asymmetric_matrix + asymmetric_matrix.T) / 2
+    return gram_matrix
+
+
+def single_greedy(X: np.ndarray, R: np.ndarray, axis_of_interest: np.ndarray, print_tqdm:bool = False) -> LowerBoundResult:
+    gram_matrix = compute_eSigmaXR_gram_matrix(X, R, axis_of_interest)
+
+    XZR_bounds = Problem1LowerBounds(
+        gram_matrix=gram_matrix, params=problem_1_lower_bounds.LowerBoundParams(
+            run_greedy=True, run_very_greedy=False,
+        ), print_tqdm=print_tqdm
+    )
+    removal_effects = compute_removal_effects(
+        X, R, axis_of_interest, XZR_bounds.greedy_lower_bound.order_of_selection, verbose=print_tqdm
+    )
+    return LowerBoundResult(
+        removal_effects=removal_effects,
+        removal_sets=[XZR_bounds.greedy_lower_bound.order_of_selection[:k+1] for k in range(len(removal_effects))]
+    )
+
+def triple_greedy(X: np.ndarray, R: np.ndarray, axis_of_interest: np.ndarray, print_tqdm:bool = True) -> LowerBoundResult:
+    n, d = X.shape
+    Z = X @ axis_of_interest
+    gram_matrix = compute_eSigmaXR_gram_matrix(X, R, axis_of_interest)
+
     XZR_bounds = Problem1LowerBounds(
         gram_matrix=gram_matrix, params=problem_1_lower_bounds.LowerBoundParams(
             run_greedy=True, run_very_greedy=False,
@@ -124,6 +155,7 @@ def triple_greedy(X: np.ndarray, R: np.ndarray, axis_of_interest: np.ndarray, pr
 class RemovalEffectsLowerBound:
     _config: LowerBoundConfig
     triple_greedy: Optional[LowerBoundResult] = None
+    single_greedy: Optional[LowerBoundResult] = None
     amip: Optional[LowerBoundResult] = None
     kzcs21: Optional[LowerBoundResult] = None
 
@@ -136,6 +168,10 @@ class RemovalEffectsLowerBound:
             if config.verbose:
                 print("Computing the Triple Greedy Lower Bound...")
             self.triple_greedy = triple_greedy(X, R, axis_of_interest, config.verbose)
+        if config.run_single_greedy:
+            if config.verbose:
+                print("Computing the Triple Greedy Lower Bound...")
+            self.single_greedy = single_greedy(X, R, axis_of_interest, config.verbose)
         if config.run_amip:
             if config.verbose:
                 print("Computing the AMIP Lower Bound...")
