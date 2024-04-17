@@ -108,18 +108,25 @@ def compute_eSigmaXR_gram_matrix(X: np.ndarray, R: np.ndarray, axis_of_interest:
 
 def single_greedy(X: np.ndarray, R: np.ndarray, axis_of_interest: np.ndarray, print_tqdm:bool = False) -> LowerBoundResult:
     gram_matrix = compute_eSigmaXR_gram_matrix(X, R, axis_of_interest)
+    Z = X @ axis_of_interest
+    ZR = Z * R  # Element-wise multiplication
+    valid_indices = np.where(ZR > 0)[0]  # Get indices where condition is true
+    filtered_gram_matrix = gram_matrix[np.ix_(valid_indices, valid_indices)]
 
     XZR_bounds = Problem1LowerBounds(
-        gram_matrix=gram_matrix, params=problem_1_lower_bounds.LowerBoundParams(
+        gram_matrix=filtered_gram_matrix, params=problem_1_lower_bounds.LowerBoundParams(
             run_greedy=True, run_very_greedy=False,
         ), print_tqdm=print_tqdm
     )
+
+    order_of_selection = valid_indices[XZR_bounds.greedy_lower_bound.order_of_selection]
+
     removal_effects = compute_removal_effects(
-        X, R, axis_of_interest, XZR_bounds.greedy_lower_bound.order_of_selection, verbose=print_tqdm
+        X, R, axis_of_interest, order_of_selection, verbose=print_tqdm
     )
     return LowerBoundResult(
         removal_effects=removal_effects,
-        removal_sets=[XZR_bounds.greedy_lower_bound.order_of_selection[:k+1] for k in range(len(removal_effects))]
+        removal_sets=[order_of_selection[:k+1] for k in range(len(removal_effects))]
     )
 
 def triple_greedy(X: np.ndarray, R: np.ndarray, axis_of_interest: np.ndarray, print_tqdm:bool = True) -> LowerBoundResult:
