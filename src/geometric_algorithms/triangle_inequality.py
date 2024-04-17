@@ -3,6 +3,7 @@ from matplotlib import pyplot as plt
 import numpy as np
 from scipy.linalg import sqrtm
 import tqdm
+import dask.array as da
 
 def refined_triangle_inequality_ips(gram_matrix: np.ndarray, verbose: bool = True) -> np.ndarray:
     """
@@ -22,11 +23,13 @@ def refined_triangle_inequality_ips(gram_matrix: np.ndarray, verbose: bool = Tru
     # Step 1: Copy and zero out the diagonal
     diag_elements = np.diag(gram_matrix).copy()
     np.fill_diagonal(gram_matrix, 0)
+    dist_gram_matrix = da.from_array(gram_matrix, chunks=(n, n//8))
+    del gram_matrix
 
     # Step 2: Sort each row
-    sorted_rows = -np.sort(-gram_matrix, axis=1)
+    sorted_rows = dist_gram_matrix.map_blocks(lambda x: -np.sort(-x, axis=1)).compute()
     # Save memory
-    del gram_matrix
+    del dist_gram_matrix
 
     # Step 3: Prepend zeros and then compute cumulative sums over rows
     cumsum_rows = np.cumsum(np.hstack((np.zeros((n, 1)), sorted_rows)), axis=1)
