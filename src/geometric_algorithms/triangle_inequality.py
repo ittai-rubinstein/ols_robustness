@@ -23,7 +23,7 @@ def refined_triangle_inequality_ips(gram_matrix: np.ndarray, verbose: bool = Tru
     # Step 1: Copy and zero out the diagonal
     diag_elements = np.diag(gram_matrix).copy()
     np.fill_diagonal(gram_matrix, 0)
-    dist_gram_matrix = da.from_array(gram_matrix, chunks=(n, n//8))
+    dist_gram_matrix = da.from_array(gram_matrix, chunks=(n//8, n))
     del gram_matrix
 
     # Step 2: Sort each row
