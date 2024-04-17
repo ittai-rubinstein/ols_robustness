@@ -16,6 +16,7 @@ from src.geometric_algorithms.triangle_inequality import refined_triangle_inequa
 from src.problem_1 import Problem1, Problem1Params
 from src.lower_bounds.removal_effects import LowerBoundConfig, RemovalEffectsLowerBound
 from src.utils.linear_regression import LinearRegression
+from src.utils.safe_min import safe_min
 
 SWITCH_TO_FLOAT32 = False
 # @dataclass
@@ -366,23 +367,23 @@ class RobustnessAuditor:
             "error_bar": self.parsed_data.delta_beta_e
         }
         indices = np.arange(1, self.parsed_data.num_samples)
-        result["Lower Bound"] = np.min(indices[self.upper_bound > self.parsed_data.beta_e])
+        result["Lower Bound"] = safe_min(indices[self.upper_bound > self.parsed_data.beta_e])
         if self.removal_effect_lower_bounds.amip:
             amip = self.removal_effect_lower_bounds.amip.removal_effects
-            result["AMIP"] = np.min(indices[:len(amip)][amip > self.parsed_data.beta_e])
+            result["AMIP"] = safe_min(indices[:len(amip)][amip > self.parsed_data.beta_e])
 
         if self.removal_effect_lower_bounds.single_greedy:
             single_greedy = self.removal_effect_lower_bounds.single_greedy.removal_effects
-            result["Greedy"] = np.min(indices[:len(single_greedy)][single_greedy > self.parsed_data.beta_e])
+            result["Greedy"] = safe_min(indices[:len(single_greedy)][single_greedy > self.parsed_data.beta_e])
 
         if self.removal_effect_lower_bounds.triple_greedy:
             triple_greedy = self.removal_effect_lower_bounds.single_greedy.removal_effects
-            result["Triple Greedy"] = np.min(indices[:len(triple_greedy)][ triple_greedy > self.parsed_data.beta_e])
+            result["Triple Greedy"] = safe_min(indices[:len(triple_greedy)][ triple_greedy > self.parsed_data.beta_e])
 
 
         if self.removal_effect_lower_bounds.kzcs21:
             kzcs21 = self.removal_effect_lower_bounds.kzcs21.removal_effects
-            result["KZCS21"] = np.min(indices[:len(kzcs21)][kzcs21 > self.parsed_data.beta_e])
+            result["KZCS21"] = safe_min(indices[:len(kzcs21)][kzcs21 > self.parsed_data.beta_e])
 
         return result
 
