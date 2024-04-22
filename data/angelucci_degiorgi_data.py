@@ -48,7 +48,8 @@ def remove_bad_categorical_rows(df, bad_data=None):
     return df
 
 def load_angelucci_data(
-        which_regression: int = 1
+        which_regression: int = 1,
+        log_hectareas: bool = False
 ) -> List[AngelucciDataset]:
     """
     Loads the data from Angelucci and De Giorgi's study on the effect of cash transfers to poor households in Mexico, to
@@ -63,7 +64,6 @@ def load_angelucci_data(
 
     The differences in the regression are fairly minor, and we support both cases for a more complete benchmark.
     """
-
     # Load the data from the .dta file
     data = pd.read_stata( CURRENT_FILE.parent / "data_files" / "angelucci_table1.dta")
     # Filter data for Cind < 10000
@@ -85,6 +85,10 @@ def load_angelucci_data(
         formula = FORMULA1
     else:
         formula = FORMULA2
+
+    if log_hectareas:
+        filtered_data['log_hectareas'] = filtered_data['hectareas'].log()
+        formula = formula.replace('hectareas', 'log_hectareas')
 
     regressions = []
     for t in range(8, 11):

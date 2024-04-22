@@ -7,8 +7,17 @@ import pandas as pd
 from matplotlib import pyplot as plt
 
 from data.data_loading_utils import DataConventions
+from src.utils.linear_regression import LinearRegression
 
 CURRENT_FILE = Path(__file__).resolve()
+
+def load_martinez_linear_regression() -> LinearRegression:
+    data = pd.read_csv(CURRENT_FILE.parent / 'data_files' / 'martinez.csv')
+    return LinearRegression(
+        data=data,
+        formula="lngdp14 ~ lndn13_fiw + fiw + fiw2 + lndn13 + C(year) + C(countrycode)",
+        special_categorical="countrycode"
+    )
 
 def load_martinez_raw(keep_all_country_categories: bool = True) -> Tuple[pd.DataFrame, List[str]]:
     """
