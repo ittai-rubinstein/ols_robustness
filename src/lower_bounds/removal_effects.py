@@ -16,7 +16,7 @@ class LowerBoundConfig:
     run_amip: bool = True
     run_kzcs21: bool = False
     verbose: bool = True
-    run_single_greedy: bool = True
+    run_single_greedy: bool = False
 
 
 import numpy as np

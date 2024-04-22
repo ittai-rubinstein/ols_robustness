@@ -159,6 +159,7 @@ class RobustnessAuditor:
             self.log("Plotting results...")
             ax = self.covariance_shift.plot_bounds()
             ax.set_title("Bounds on CS")
+            ax.figure.tight_layout()
             ax.figure.savefig(self.config.output_dir / "covariance_shift.png")
 
     def compute_XR_bounds(self):
@@ -173,6 +174,7 @@ class RobustnessAuditor:
             self.log("Plotting results...")
             ax = self.XR_bounds.plot_bounds()
             ax.set_title(r"Bounds on $\Vert XR \Vert$")
+            ax.figure.tight_layout()
             ax.figure.savefig(self.config.output_dir / "xr_bounds.png")
 
     def compute_XZ_bounds(self):
@@ -187,6 +189,7 @@ class RobustnessAuditor:
             self.log("Plotting results...")
             ax = self.XZ_bounds.plot_bounds()
             ax.set_title(r"Bounds on $\Vert XZ \Vert$")
+            ax.figure.tight_layout()
             ax.figure.savefig(self.config.output_dir / "xz_bounds.png")
 
     def compute_XZR_bounds(self):
@@ -205,6 +208,7 @@ class RobustnessAuditor:
             self.log("Plotting results...")
             ax = self.XZR_bounds.plot_bounds()
             ax.set_title(r"Bounds on $<e^T \Sigma_T, \sum_{i\in T} X_i R_i>$")
+            ax.figure.tight_layout()
             ax.figure.savefig(self.config.output_dir / "xzr_bounds.png")
 
     def compute_linear_effect_bounds(self):
@@ -216,6 +220,7 @@ class RobustnessAuditor:
             self.log("Plotting results...")
             ax = self.linear_effect_bounds.plot_bounds()
             ax.set_title(r"Bounds on the Direct Effects")
+            ax.figure.tight_layout()
             ax.figure.savefig(self.config.output_dir / "direct_effects.png")
 
     def _compute_k_singular(self):
@@ -367,7 +372,7 @@ class RobustnessAuditor:
             "error_bar": self.parsed_data.delta_beta_e
         }
         indices = np.arange(1, self.parsed_data.num_samples)
-        result["Lower Bound"] = safe_min(indices[self.upper_bound > self.parsed_data.beta_e])
+        result["Lower Bound"] = safe_min(indices[:len(self.upper_bound)][self.upper_bound > self.parsed_data.beta_e])
         if self.removal_effect_lower_bounds.amip:
             amip = self.removal_effect_lower_bounds.amip.removal_effects
             result["AMIP"] = safe_min(indices[:len(amip)][amip > self.parsed_data.beta_e])
@@ -395,29 +400,34 @@ class RobustnessAuditor:
         fig, ax = plt.subplots()
         ax.set_xscale("log")
         ax.set_yscale("log")
-        ax.grid(True, which="both", linestyle='-', linewidth='0.5', color='grey')
-        ax.grid(True, which="minor", linestyle='--')
+        ax.grid(True, which="both", linestyle='--', linewidth='0.75', color='grey')
+        ax.grid(True, which="major", linestyle='-', linewidth='1', color='grey')
 
         # Plotting bounds
-        ax.plot(k_vals[:self.k_singular+1], self.upper_bound[:self.k_singular+1], 'b-', label='Upper Bound')
+        ax.plot(k_vals[:self.k_singular+1], self.upper_bound[:self.k_singular+1],
+                'b-', label='Upper Bound', linewidth=3)
         if self.freund_and_hopkins_upper_bound is not None:
-            ax.plot(k_vals, self.freund_and_hopkins_upper_bound, 'g-', label='Freund & Hopkins')
+            ax.plot(k_vals, self.freund_and_hopkins_upper_bound,
+                    'g-', label='Freund & Hopkins', linewidth=3)
 
         # Plotting lower bounds
         if self.removal_effect_lower_bounds.amip:
             ax.plot(k_vals[:len(self.removal_effect_lower_bounds.amip.removal_effects)],
-                    self.removal_effect_lower_bounds.amip.removal_effects, 'r--', label='AMIP Lower Bound')
+                    self.removal_effect_lower_bounds.amip.removal_effects, 'r--', label='AMIP Lower Bound', linewidth=3)
         if self.removal_effect_lower_bounds.kzcs21:
             ax.plot(k_vals[:len(self.removal_effect_lower_bounds.kzcs21.removal_effects)],
-                    self.removal_effect_lower_bounds.kzcs21.removal_effects, 'r-.', label='KZCS21 Lower Bound')
+                    self.removal_effect_lower_bounds.kzcs21.removal_effects, 'r-.', label='KZCS21 Lower Bound', linewidth=3)
         if self.removal_effect_lower_bounds.triple_greedy:
-            ax.plot(k_vals[:len(self.removal_effect_lower_bounds.triple_greedy.removal_effects)],
-                    self.removal_effect_lower_bounds.triple_greedy.removal_effects, 'r-', label='Triple Greedy Lower Bound')
+            ax.plot(
+                k_vals[:len(self.removal_effect_lower_bounds.triple_greedy.removal_effects)],
+                self.removal_effect_lower_bounds.triple_greedy.removal_effects, 'r-', label='Triple Greedy Lower Bound',
+                linewidth=3
+            )
         if self.removal_effect_lower_bounds.single_greedy:
             ax.plot(k_vals[:len(self.removal_effect_lower_bounds.single_greedy.removal_effects)],
-                    self.removal_effect_lower_bounds.single_greedy.removal_effects, 'r:', label=r'Greedy $\left \langle \Sigma_T e, \sum_{i \in T} X_i R_i \right \rangle$ Lower Bound')
+                    self.removal_effect_lower_bounds.single_greedy.removal_effects, 'r:', label=r'Greedy $\left \langle \Sigma_T e, \sum_{i \in T} X_i R_i \right \rangle$ Lower Bound', linewidth=3)
 
-        ax.axhline(y=self.parsed_data.beta_e, color='black', label=r'$<\beta, e>$')
+        ax.axhline(y=self.parsed_data.beta_e, color='black', label=r'$<\beta, e>$', linewidth=3)
 
         # Calculate the desired upper y-limit
         upper_y_limit = self.parsed_data.beta_e + 10 * self.parsed_data.delta_beta_e
@@ -428,8 +438,7 @@ class RobustnessAuditor:
         ax.legend()
         ax.set_xlabel('Number of Samples Removed (k)')
         ax.set_ylabel('Removal Effect Estimates')
-        fig.tight_layout()
-
+        ax.figure.tight_layout()
         # Save the figure
         output_file = Path(self.config.output_dir) / "removal_effects_plot.png"
         fig.savefig(output_file)

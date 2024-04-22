@@ -79,34 +79,38 @@ class Problem1:
         fig, ax = plt.subplots()
         ax.set_xscale("log")
         ax.set_yscale("log")
-        ax.grid(True, which="both", linestyle='-', linewidth='0.5', color='grey')
+        ax.grid(True, which="both", linestyle='--', linewidth='0.75', color='grey')
+        ax.grid(True, which="major", linestyle='-', linewidth='1', color='grey')
+
 
         # Plot upper bounds if they exist
         k_vals = np.arange(1, len(self.upper_bounds.combined_bound)//10 + 1)
         if self.upper_bounds.triangle_upper_bound is not None:
             ax.plot(k_vals, self.upper_bounds.triangle_upper_bound[:len(k_vals)], linestyle='--', color='blue',
-                    label='Triangle Upper Bound')
+                    label='Triangle Upper Bound', linewidth=3)
         if self.upper_bounds.spectral_upper_bound is not None:
             ax.plot(k_vals, self.upper_bounds.spectral_upper_bound[:len(k_vals)], linestyle='-.', color='blue',
-                    label='Spectral Upper Bound')
+                    label='Spectral Upper Bound', linewidth=3)
         ax.plot(k_vals, self.upper_bounds.combined_bound[:len(k_vals)], linestyle='-', color='blue',
-                label='Combined Upper Bound')
+                label='Combined Upper Bound', linewidth=3)
 
         # Plot lower bounds if they exist
         if self.lower_bounds.greedy_lower_bound is not None:
             ax.plot(k_vals[:len(self.lower_bounds.greedy_lower_bound.lower_bounds)],
                     self.lower_bounds.greedy_lower_bound.lower_bounds[:len(k_vals)], linestyle='--', color='red',
-                    label='Greedy Lower Bound')
+                    label='Greedy Lower Bound', linewidth=3)
         if self.lower_bounds.very_greedy_lower_bound is not None:
             ax.plot(k_vals[:len(self.lower_bounds.very_greedy_lower_bound.lower_bounds)],
                     self.lower_bounds.very_greedy_lower_bound.lower_bounds[:len(k_vals)], linestyle='-.', color='red',
-                    label='Very Greedy Lower Bound')
+                    label='Very Greedy Lower Bound', linewidth=3)
 
-        ax.set_xlabel('Number of Samples Removed (k)')
-        ax.set_ylabel('Problem 1 Estimates')
-        ax.legend()
+        ax.set_xlabel('Number of Samples Removed', fontsize='x-large')
+        ax.set_ylabel('Problem 1 Estimates', fontsize='x-large')
+        ax.legend(fontsize='x-large')
+        # Set the fontsize of the tick labels
+        ax.tick_params(axis='both', labelsize='large')
 
-        fig.tight_layout
+        fig.tight_layout()
         plt.close(fig)
 
         return ax
