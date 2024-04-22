@@ -86,8 +86,12 @@ def load_angelucci_data(
     else:
         formula = FORMULA2
 
+    # The hectacres column used in the regression is highly non-hypercontractive, with <0.5% of the samples
+    # contributing >80% of the variance. To counter this, we measure the effect of replacing this column with
+    # log(hectacres) instead. However, about 25-50% of households have no land at all, so we add 1 hectacre
+    # (the median) to all households in the hopes that log is sufficiently well-behaved in the remaining regime.
     if log_hectareas:
-        filtered_data['log_hectareas'] = filtered_data['hectareas'].log()
+        filtered_data['log_hectareas'] = np.log(1 + filtered_data['hectareas'])
         formula = formula.replace('hectareas', 'log_hectareas')
 
     regressions = []
