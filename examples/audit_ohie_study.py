@@ -35,6 +35,7 @@ for ols_regression in ols_regressions:
     print(df)
     df.to_csv(base_dir / "ols" / "robustness_bounds.csv")
 
+results = []
 print("Running robustness auditor on IV regressors:")
 for iv_regression in iv_regressions:
     for (name, regression) in [
@@ -52,7 +53,7 @@ for iv_regression in iv_regressions:
         ra.compute_all_bounds()
         ra.plot_removal_effects()
         result = ra.summary()
-        result["experiment"] = ols_regression.name
+        result["experiment"] = name
         results.append(result)
         df = pd.DataFrame(results)
         df = df[["experiment"] + [col for col in df.columns if col != "experiment"]]
