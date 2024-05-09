@@ -24,8 +24,8 @@ class AngelucciDataset(NamedTuple):
 # Conversion of 'hhhage' to numerical
 HHHAGE_REPLACEMENTS= {
     '97 y más': 97,  # Replace '97 y más' with 97
-    'no sabe': 98,  # Replace 'no sabe' with NaN
-    'nr': 99  # Replace 'nr' with NaN
+    'no sabe': 98,  # Replace 'no sabe' with 98
+    'nr': 99  # Replace 'nr' with 99
 }
 
 
