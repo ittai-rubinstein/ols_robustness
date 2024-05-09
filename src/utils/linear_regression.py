@@ -123,7 +123,7 @@ class LinearRegression:
         self.Z = self.feature_array[column_of_interest]  # First column is now the column of interest
 
         self.regression_arrays = RegressionArrays(
-            X=self.feature_array.drop(columns=['Intercept'], errors='ignore').to_numpy(),
+            X=self.feature_array.to_numpy(),
             R=self.residuals, Z=self.Z.to_numpy()
         )
 

@@ -112,9 +112,9 @@ class RobustnessAuditor:
             beta_e = -beta_e
             R = -R
 
-        # Reaverage X if the config flag is set
-        if self.config.reaverage:
-            X = X - X.mean(axis=0)
+        # # Reaverage X if the config flag is set
+        # if self.config.reaverage:
+        #     X = X - X.mean(axis=0)
 
         # Compute the covariance matrix Sigma and its square root
         Sigma = X.T @ X
