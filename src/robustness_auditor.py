@@ -369,8 +369,12 @@ class RobustnessAuditor:
         self.upper_bound[self.upper_bound < 0] = np.inf
         result = {
             "fit_value": self.parsed_data.beta_e * self.parsed_data.beta_e_sign,
-            "error_bar": self.parsed_data.delta_beta_e
+            "error_bar": self.parsed_data.delta_beta_e,
+            "dimension": self.parsed_data.dimension,
+            "num_samples": self.parsed_data.num_samples
         }
+        if self.linear_regression.special_categorical:
+            result['singularity'] = min(map(len, self.linear_regression.categorical_aware.split_R))
         indices = np.arange(1, self.parsed_data.num_samples)
         result["Lower Bound"] = safe_min(indices[:len(self.upper_bound)][self.upper_bound > self.parsed_data.beta_e])
         if self.removal_effect_lower_bounds.amip:
