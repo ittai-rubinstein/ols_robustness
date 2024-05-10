@@ -14,26 +14,7 @@ print("Done")
 
 CURRENT_DIR = Path(__file__).resolve().parent
 base_dir = CURRENT_DIR / "results" / "ohie"
-results = []
-print("Running robustness auditor on OLS regressors:")
-for ols_regression in ols_regressions:
-    for i in range(2):
-        print('*'*80)
-    print(f"Running on {ols_regression.name=}")
-    for i in range(2):
-        print('*'*80)
-    output_dir = base_dir / "ols" / ols_regression.name
-    config = AuditorConfig(output_dir=output_dir)
-    ra = RobustnessAuditor(ols_regression.regression, config)
-    ra.compute_all_bounds()
-    ra.plot_removal_effects()
-    result = ra.summary()
-    result["experiment"] = ols_regression.name
-    results.append(result)
-    df = pd.DataFrame(results)
-    df = df[["experiment"] + [col for col in df.columns if col != "experiment"]]
-    print(df)
-    df.to_csv(base_dir / "ols" / "robustness_bounds.csv")
+
 
 results = []
 print("Running robustness auditor on IV regressors:")
@@ -59,3 +40,26 @@ for iv_regression in iv_regressions:
         df = df[["experiment"] + [col for col in df.columns if col != "experiment"]]
         print(df)
         df.to_csv(base_dir / "iv" / "robustness_bounds.csv")
+        print("Saved results to", base_dir / "iv" / "robustness_bounds.csv")
+
+results = []
+print("Running robustness auditor on OLS regressors:")
+for ols_regression in ols_regressions:
+    for i in range(2):
+        print('*'*80)
+    print(f"Running on {ols_regression.name=}")
+    for i in range(2):
+        print('*'*80)
+    output_dir = base_dir / "ols" / ols_regression.name
+    config = AuditorConfig(output_dir=output_dir)
+    ra = RobustnessAuditor(ols_regression.regression, config)
+    ra.compute_all_bounds()
+    ra.plot_removal_effects()
+    result = ra.summary()
+    result["experiment"] = ols_regression.name
+    results.append(result)
+    df = pd.DataFrame(results)
+    df = df[["experiment"] + [col for col in df.columns if col != "experiment"]]
+    print(df)
+    df.to_csv(base_dir / "ols" / "robustness_bounds.csv")
+    print("Saved results to", base_dir / "ols" / "robustness_bounds.csv")
