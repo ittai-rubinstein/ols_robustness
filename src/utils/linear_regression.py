@@ -142,11 +142,6 @@ class LinearRegression:
         X_prime_df = X_prime_df.drop(columns=['Intercept'], errors='ignore')  # Drop the intercept column if it exists
         X_prime_df = drop_zero_std_columns(X_prime_df)
 
-        # Apply weights similarly
-        if self.weight:
-            sub_weights = self.data.loc[self.indices, self.weight]  # Directly use the same indices to slice weights
-            X_prime_df = X_prime_df.multiply(np.sqrt(sub_weights), axis=0)
-
         # Add one-hot encoding of the special categorical column to X_prime
         cat_encoded = pd.get_dummies(self.data.loc[self.indices, self.special_categorical],
                                      prefix=self.special_categorical)
@@ -156,11 +151,18 @@ class LinearRegression:
         label = self.formula.split("~")[0].strip()
         df[label] = self.data.loc[self.indices, label]
 
+        # Apply weights similarly
+        if self.weight:
+            sub_weights = self.data.loc[self.indices, self.weight]  # Directly use the same indices to slice weights
+            sub_weights = sub_weights / np.min(sub_weights) # renormalize weights so that minimal weight is 1
+            df[self.weight] = sub_weights
+
         # Split and normalize the DataFrame based on the categorical columns
-        bucket_dfs = split_and_normalize(df, list(cat_encoded.columns))
+        bucket_dfs = split_and_normalize(df, list(cat_encoded.columns), weights=self.weight)
+        self.bucket_dfs = bucket_dfs
 
         # Perform linear regression and append residuals
-        coefficients = perform_regression_and_append_residuals(bucket_dfs, label)
+        coefficients = perform_regression_and_append_residuals(bucket_dfs, label, weights=self.weight)
         beta_e = np.abs(coefficients[self.column_of_interest])
         beta_e_sign = np.sign(coefficients[self.column_of_interest])
 

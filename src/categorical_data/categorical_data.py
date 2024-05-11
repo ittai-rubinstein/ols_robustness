@@ -4,11 +4,12 @@ import tqdm
 import pandas as pd
 import numpy as np
 import scipy.linalg
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Optional
 from sklearn.linear_model import LinearRegression
 
 def split_and_normalize(
-    df: pd.DataFrame, one_hot_columns: List[str], verbose: bool = True
+    df: pd.DataFrame, one_hot_columns: List[str], verbose: bool = True,
+        weights: Optional[str] = None
 ) -> List[pd.DataFrame]:
     """
     Splits the input dataframe into multiple smaller dataframes based on the provided one-hot encoded columns.
@@ -22,17 +23,34 @@ def split_and_normalize(
     Returns:
     List[pd.DataFrame]: A list of smaller dataframes, each normalized by subtracting the mean of continuous features.
     """
-
+    print(f"{weights=}")
     smaller_dfs = []
     for col in tqdm.tqdm(one_hot_columns, desc="Separating by categorical columns", disable=not verbose):
         # Select rows where the one-hot encoded column is 1
-        subset = df[df[col] == 1]
+        subset = df[df[col] > 0]
 
         # Drop the one-hot encoding columns for the current subset
-        subset = subset.drop(columns=one_hot_columns)
+        subset = subset.drop(columns=one_hot_columns, inplace=False)
 
-        # Normalize the continuous features by subtracting the mean
-        subset = subset - subset.mean()
+        # Normalize the continuous features by subtracting the mean from each bucket
+        if weights is None:
+            subset = subset - subset.mean()
+        else:
+            weights_column = subset[weights].copy()  # Store the weights in a separate variable for easier access
+            subset.drop(columns=weights, inplace=True)  # Drop the weights column correctly
+            weighted_means = (subset.multiply(weights_column,
+                                              axis=0).sum() / weights_column.sum())  # Calculate the weighted mean for each column
+            subset = subset - weighted_means  # Subtract the weighted mean from each column
+            subset = subset.multiply(np.sqrt(weights_column), axis=0)  # Multiply by the square root of the weights
+            # # Multiply all columns except 'weights' by the weights column
+            # for col2 in subset.columns:
+            #     if col2 == weights:
+            #         continue
+            #     if col2 != weights:
+            #         v = subset[col2] * np.sqrt(weights_column)
+            #         w = np.sqrt(weights_column)
+            #         subset[col2] = v - (np.dot(v, w) / np.linalg.norm(w)**2) * w
+            #         # subset[col2] = subset[col2] - ((subset[col2] * np.sqrt(weights_column)).sum() / np.sum(weights_column))
 
         smaller_dfs.append(subset)
 
@@ -42,7 +60,8 @@ def split_and_normalize(
 def perform_regression_and_append_residuals(
         split_dfs: List[pd.DataFrame],
         label: str,
-        verbose: bool = False
+        verbose: bool = False,
+        weights: Optional[str] = None
 ) -> Dict[str, float]:
     """
     Perform linear regression on the combined dataframe, append residuals to each split dataframe in-place,
@@ -59,10 +78,11 @@ def perform_regression_and_append_residuals(
         print("Computing residuals...")
     combined_df = pd.concat(split_dfs)
     # Extract features
-    features = [col for col in combined_df.columns if col != label]
+    features = [col for col in combined_df.columns if col != label and col != weights]
+    print(features)
 
     # Create a Linear Regression model
-    model = LinearRegression()
+    model = LinearRegression(fit_intercept=False)
 
     # Fit the model using the combined dataframe
     model.fit(combined_df[features], combined_df[label])
