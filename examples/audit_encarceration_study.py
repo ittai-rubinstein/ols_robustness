@@ -1,14 +1,15 @@
 import pandas as pd
 import numpy as np
 
+from data.eubank import load_eubank_regression
 from data.martinez import load_martinez_linear_regression
 from src.robustness_auditor import AuditorConfig, RobustnessAuditor
 from pathlib import Path
 
-regression = load_martinez_linear_regression()
+regression = load_eubank_regression()
 
 CURRENT_DIR = Path(__file__).resolve().parent
-base_dir = CURRENT_DIR / "results" / "martinez"
+base_dir = CURRENT_DIR / "results" / "eubank"
 results = []
 for categorical_aware in [False, True]:
     ra = RobustnessAuditor(

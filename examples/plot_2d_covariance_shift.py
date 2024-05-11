@@ -9,6 +9,7 @@ import pandas as pd
 from src.robustness_auditor import AuditorConfig, RobustnessAuditor
 
 # Updated parameters
+FIGSIZE = (9, 7)
 num_inliers = 1000
 num_outliers = 10
 epsilon = num_outliers / num_inliers
@@ -41,22 +42,22 @@ model_inliers.fit(X[:num_inliers, :], Y[:num_inliers])
 Y_pred_inliers = model_inliers.coef_[0] * X1_inliers + model_inliers.coef_[1] * X2_inliers
 
 # Plotting the graph
-plt.figure(figsize=(12, 8), dpi=400)
+plt.figure(figsize=FIGSIZE, dpi=400)
 plt.scatter(X1_inliers, X2_inliers, color='blue', label='Inliers')
 plt.scatter(X1_outliers, X2_outliers, color='red', label='Outliers', marker='x')
-plt.xlabel('$X_1$', fontsize='xx-large')
-plt.ylabel('$X_2$', fontsize='xx-large')
+plt.xlabel('$X_1$', fontsize=20)
+plt.ylabel('$X_2$', fontsize=20)
 # plt.title('Updated Scatter plot of $X_1$ vs $X_2$ with $\epsilon=0.1$')
-plt.legend(fontsize="x-large")
+plt.legend(fontsize=16)
 plt.grid(True)
 
 formula_all = f"Combined fit: $Y = {model_combined.coef_[0]:.1f} X_1 + {model_combined.coef_[1]:.1f} X_2 + {model_combined.intercept_:.1f}$"
 formula_in = f"Inlier fit: $Y = {model_inliers.coef_[0]:.1f} X_1 + {model_inliers.coef_[1]:.1f} X_2$ + {model_inliers.intercept_:.1f}"
-plt.text(0.5, 0.65, formula_all + "\n" + "\n" + formula_in, fontsize='xx-large', horizontalalignment='center', verticalalignment='center',
+plt.text(0.5, 0.65, formula_all + "\n" + "\n" + formula_in, fontsize=20, horizontalalignment='center', verticalalignment='center',
          transform=plt.gca().transAxes, bbox=dict(facecolor='white', alpha=0.5, edgecolor='black', boxstyle='round,pad=1'))
 plt.tight_layout()
 # plt.show()
-plt.savefig('./results/2d_cs.png')
+plt.savefig('./results/figures/2d_cs.png')
 
 # Format the results
 # print(f"Combined fit: Y = {model_combined.coef_[0]:.3f} X_1 + {model_combined.coef_[1]:.3f} X_2")

@@ -1,14 +1,20 @@
 import pandas as pd
 from pathlib import Path
 
+import matplotlib.pyplot as plt
+import numpy as np
+
 # Load the Martinez data
 current_file_path = Path(__file__).parent
 
 # Define the paths to the CSV files relative to the current file path
 cash_transfers_path = current_file_path / 'results/cash_transfers/results.csv'
 martinez_path = current_file_path / 'results/martinez/results.csv'
-ohie_path = current_file_path / 'results/ohie/results.csv'
+eubank_path = current_file_path / 'results/eubank/results.csv'
+ohie_path = current_file_path / 'results/ohie/iv/robustness_bounds.csv'
 
+
+COLUMNS_TO_KEEP = ['AMIP', 'Lower Bound', 'Paper', 'singularity', 'dimension']
 
 
 martinez_df = pd.read_csv(martinez_path).drop(columns=["Unnamed: 0"])
@@ -21,9 +27,26 @@ categorical_unaware_bound = martinez_df.loc[martinez_df['categorical_aware'] == 
 martinez_summary = pd.DataFrame({
     'AMIP': [amip],
     'Categorical Aware Lower Bound': [categorical_aware_bound],
-    'Categorical Unaware Lower Bound': [categorical_unaware_bound]
+    'Categorical Unaware Lower Bound': [categorical_unaware_bound],
+    'dimension': [martinez_df.loc[martinez_df['categorical_aware'] == True, 'dimension'].min()],
+    'singularity': [martinez_df.loc[martinez_df['categorical_aware'] == True, 'singularity'].min()]
 })
-print(martinez_summary)
+
+eubank_df = pd.read_csv(eubank_path).drop(columns=["Unnamed: 0"])
+
+# Extract relevant details
+amip = eubank_df['AMIP'].iloc[0]  # Assuming AMIP value is constant across rows
+categorical_aware_bound = eubank_df.loc[eubank_df['categorical_aware'] == True, 'Lower Bound'].min()
+categorical_unaware_bound = eubank_df.loc[eubank_df['categorical_aware'] == False, 'Lower Bound'].min()
+
+eubank_summary = pd.DataFrame({
+    'AMIP': [amip],
+    'Categorical Aware Lower Bound': [categorical_aware_bound],
+    'Categorical Unaware Lower Bound': [categorical_unaware_bound],
+    'dimension': [eubank_df.loc[eubank_df['categorical_aware'] == True, 'dimension'].min()],
+    'singularity': [eubank_df.loc[eubank_df['categorical_aware'] == True, 'singularity'].min()]
+})
+
 
 ohie_df = pd.read_csv(ohie_path).drop(columns=["Unnamed: 0"])
 
@@ -35,10 +58,16 @@ for exp in experiments:
     exp_data = ohie_df[ohie_df['experiment'].str.contains(exp)]
     min_amip = exp_data['AMIP'].min()
     min_lower_bound = exp_data['Lower Bound'].min()
-    ohie_summary.append({'Experiment': exp, 'Min AMIP': min_amip, 'Min Lower Bound': min_lower_bound})
+    dimension = exp_data['dimension'].min()
+    if "singularity" in exp_data.columns:
+        singularity = exp_data['singularity'][0]
+    else:
+        singularity = np.inf
+    #
+    ohie_summary.append({'Experiment': exp, 'Min AMIP': min_amip, 'Min Lower Bound': min_lower_bound,
+                         "dimension":dimension, "singularity":singularity})
 
 ohie_summary_df = pd.DataFrame(ohie_summary)
-print(ohie_summary_df)
 
 
 # Load the Cash Transfers data
@@ -62,10 +91,14 @@ import matplotlib.pyplot as plt
 
 # Martinez - already summarized
 martinez_df = martinez_summary
-martinez_df['Paper'] = 'Martinez'
+martinez_df['Paper'] = 'Nightlights'
+
+# Eubank - already summarized
+eubank_df = eubank_summary
+eubank_df['Paper'] = 'Incarceration'
 
 # Cash Transfers - sorting by treatment and time
-cash_transfers_df['Paper'] = 'Cash Transfers'
+cash_transfers_df['Paper'] = 'Cash Transfer'
 
 # OHIE - sorting by a predefined order
 order = [
@@ -83,30 +116,31 @@ ohie_summary_df['Paper'] = 'OHIE'
 # Martinez Data Adjustment
 martinez_df.rename(columns={'Categorical Aware Lower Bound': 'Lower Bound'}, inplace=True)
 martinez_df['AMIP'] = martinez_df['AMIP']  # Ensure there is an 'AMIP' column if missing
-martinez_df = martinez_df[['AMIP', 'Lower Bound', 'Paper']]
+martinez_df = martinez_df[COLUMNS_TO_KEEP]
+
+eubank_df.rename(columns={'Categorical Aware Lower Bound': 'Lower Bound'}, inplace=True)
+eubank_df = eubank_df[COLUMNS_TO_KEEP]
 
 # OHIE Data Adjustment
 ohie_summary_df.rename(columns={'Min AMIP': 'AMIP', 'Min Lower Bound': 'Lower Bound'}, inplace=True)
-ohie_summary_df = ohie_summary_df[['AMIP', 'Lower Bound', 'Paper']]
+ohie_summary_df = ohie_summary_df[COLUMNS_TO_KEEP]
 
 # Filtering Cash Transfers data for plotting
 plot_cash_transfers_df = cash_transfers_df[cash_transfers_df['Log Hectares'] == True]
 
 # Concatenate all dataframes for plotting
-all_data = pd.concat([martinez_df, plot_cash_transfers_df, ohie_summary_df])
+all_data = pd.concat([martinez_df, plot_cash_transfers_df, ohie_summary_df, eubank_df])
 
 
-
-import matplotlib.pyplot as plt
-import numpy as np
 
 # Plotting code as previously described, using the 'all_data' DataFrame
 fig, ax = plt.subplots(figsize=(12, 8), dpi=500)
-colors = ['red', 'blue']
+COLUMNS_TO_PLOT = ["AMIP", "Lower Bound"]
+colors = ['red', 'blue', 'green']
 papers = all_data['Paper'].unique()
 x_pos = 0
 width = 0.35
-group_width = width * 2 + 0.1
+group_width = width * len(COLUMNS_TO_PLOT) + 0.1
 group_gap = 1.5
 positions = []
 labels = []
@@ -115,8 +149,10 @@ for paper in papers:
     paper_data = all_data[all_data['Paper'] == paper]
     start_pos = x_pos
     for i in range(len(paper_data)):
-        ax.bar(x_pos, paper_data.iloc[i]['AMIP'], width, color='red')
-        ax.bar(x_pos + width, paper_data.iloc[i]['Lower Bound'], width, color='blue')
+        ax.bar(x_pos, paper_data.iloc[i][COLUMNS_TO_PLOT[0]], width, color=colors[0])
+        ax.bar(x_pos + width, paper_data.iloc[i][COLUMNS_TO_PLOT[1]], width, color=colors[1])
+        # n, d = map(int, paper_data.iloc[i]['dimension'].strip('()').split(', '))
+        # ax.bar(x_pos + 2*width, np.ceil(50 / np.log2(n)), width, color=colors[2])
         x_pos += group_width
     end_pos = x_pos - group_width + width
     positions.append((start_pos + end_pos) / 2)
@@ -136,4 +172,4 @@ plt.grid(which='major', linestyle='-', axis='y')
 plt.grid(which='minor', linestyle='--', axis='y')
 plt.tight_layout()
 plt.ylim(1, plt.ylim()[1])
-plt.savefig(current_file_path / "results" / "bar_plot.png")
+plt.savefig(current_file_path / "results" / "figures" / "bar_plot.png")
