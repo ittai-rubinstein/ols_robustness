@@ -32,6 +32,7 @@ class CategoricalAware:
     dimension: int
     split_X: List[np.ndarray]
     split_R: List[np.ndarray]
+    split_weights: List[np.ndarray]
 
 
 # @dataclass
@@ -172,6 +173,10 @@ class LinearRegression:
             self.column_of_interest,
             sign=beta_e_sign
         )
+        if self.weight:
+            split_weights = [bdf[self.weight].to_numpy() for bdf in bucket_dfs]
+        else:
+            split_weights = [np.ones_like(sx) for sx in split_X]
         X = np.vstack(split_X)
         residuals = np.concatenate(split_R)
         num_samples, dimension = X.shape
@@ -186,7 +191,8 @@ class LinearRegression:
             num_samples=num_samples,
             dimension=dimension,
             split_X=split_X,
-            split_R=split_R
+            split_R=split_R,
+            split_weights=split_weights
         )
 
 # Example usage:

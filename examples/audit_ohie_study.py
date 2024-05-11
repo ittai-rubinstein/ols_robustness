@@ -13,7 +13,7 @@ iv_regressions = load_ohie_regressions(iv=True)
 print("Done")
 
 CURRENT_DIR = Path(__file__).resolve().parent
-base_dir = CURRENT_DIR / "results" / "ohie"
+base_dir = CURRENT_DIR / "results" / "ohie_categorical"
 
 
 results = []
@@ -31,7 +31,7 @@ for iv_regression in iv_regressions:
         output_dir = base_dir / "iv" /name
         config = AuditorConfig(output_dir=output_dir)
         ra = RobustnessAuditor(regression, config)
-        ra.compute_all_bounds()
+        ra.compute_all_bounds(categorical_aware=True)
         ra.plot_removal_effects()
         result = ra.summary()
         result["experiment"] = name
@@ -53,7 +53,7 @@ for ols_regression in ols_regressions:
     output_dir = base_dir / "ols" / ols_regression.name
     config = AuditorConfig(output_dir=output_dir)
     ra = RobustnessAuditor(ols_regression.regression, config)
-    ra.compute_all_bounds()
+    ra.compute_all_bounds(categorical_aware=True)
     ra.plot_removal_effects()
     result = ra.summary()
     result["experiment"] = ols_regression.name

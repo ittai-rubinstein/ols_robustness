@@ -286,6 +286,7 @@ class RobustnessAuditor:
         # Extract information about the linear regression from the relevant field of self:
         split_X = self.linear_regression.categorical_aware.split_X
         split_R = self.linear_regression.categorical_aware.split_R
+        split_weights = self.linear_regression.categorical_aware.split_weights
         X = np.vstack(split_X)
         residuals = np.concatenate(split_R)
         num_samples, dimension = X.shape
@@ -299,7 +300,7 @@ class RobustnessAuditor:
 
         # Compute a mapping from bucket index to upper bounds on its direct influences as a function of the number of samples removed from it:
         bounds_list = compute_bounds_for_all(
-            split_X, split_R, axis_of_interest_normalized
+            split_X, split_R, axis_of_interest_normalized, split_weights
         )
         # Use a dynamic programming algorithm to solve the integer knapsack to maximize the total direct influences
         total_score_bounds = dynamic_programming_1d(bounds_list, num_samples // 10 + 1)[1:]
@@ -308,8 +309,8 @@ class RobustnessAuditor:
 
         # These are bounds on the norm of the sum of any $k$ members of any bucket:
         category_norm_bounds = [
-            refined_triangle_inequality_ips(bucket @ bucket.T, verbose=False)
-            for bucket in split_X
+            refined_triangle_inequality_ips(np.diag(np.sqrt(bws)) @ bucket @ bucket.T @ np.diag(np.sqrt(bws)), verbose=False)
+            for bucket, bws in zip(split_X, split_weights)
         ]
         # In sum ips functions, we do not include the options for 0 or n removals
         category_norm_bounds = [
@@ -342,7 +343,7 @@ class RobustnessAuditor:
         XR = X * residuals[:, np.newaxis]
         gram_matrix_XR = XR @ XR.transpose()
 
-        ku_xr_data = compute_ku_data(gram_matrix_XR, split_R, category_norm_bounds)
+        ku_xr_data = compute_ku_data(gram_matrix_XR, [sr * np.sqrt(sw) for sr, sw in zip(split_R, split_weights)], category_norm_bounds)
         ku_xr_bounds = compute_ku_bounds(ku_xr_data, ku_params)
         del ku_xr_data, gram_matrix_XR
 
@@ -350,7 +351,7 @@ class RobustnessAuditor:
         split_Z = [bucket @ axis_of_interest_normalized for bucket in split_X]
         gram_matrix_XZ = XZ @ XZ.transpose()
 
-        ku_xe_data = compute_ku_data(gram_matrix_XZ, split_Z, category_norm_bounds)
+        ku_xe_data = compute_ku_data(gram_matrix_XZ, [sz * np.sqrt(sw) for sz, sw in zip(split_Z, split_weights)], category_norm_bounds)
         ku_xe_bounds = compute_ku_bounds(ku_xe_data, ku_params)
         del ku_xe_data, gram_matrix_XZ
 

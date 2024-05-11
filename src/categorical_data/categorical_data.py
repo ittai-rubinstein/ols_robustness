@@ -37,11 +37,12 @@ def split_and_normalize(
             subset = subset - subset.mean()
         else:
             weights_column = subset[weights].copy()  # Store the weights in a separate variable for easier access
-            subset.drop(columns=weights, inplace=True)  # Drop the weights column correctly
+            # subset.drop(columns=weights, inplace=True)  # Drop the weights column correctly
             weighted_means = (subset.multiply(weights_column,
                                               axis=0).sum() / weights_column.sum())  # Calculate the weighted mean for each column
             subset = subset - weighted_means  # Subtract the weighted mean from each column
             subset = subset.multiply(np.sqrt(weights_column), axis=0)  # Multiply by the square root of the weights
+            subset[weights] = weights_column
             # # Multiply all columns except 'weights' by the weights column
             # for col2 in subset.columns:
             #     if col2 == weights:
@@ -256,7 +257,7 @@ def calculate_bounds_efficient(
 
 def compute_bounds_for_all(
     split_X: List[np.ndarray], split_R: List[np.ndarray],
-    axis_of_interest_normalized: np.ndarray, verbose: bool = True, include_linear: int = 1
+    axis_of_interest_normalized: np.ndarray, split_weights: List[np.ndarray], verbose: bool = True, include_linear: int = 1
 ) -> List[np.ndarray]:
     """
     We define the score of a bucket / set S to be
@@ -276,11 +277,11 @@ def compute_bounds_for_all(
     """
     bounds_list = []
 
-    for i, (X, R) in enumerate(zip(
+    for i, (X, R, weights) in enumerate(zip(
             tqdm.tqdm(split_X, desc="Bounding influence by category", disable=not verbose),
-            split_R
+            split_R, split_weights
     )):
-        bounds = calculate_bounds_efficient(X, R, axis_of_interest_normalized, include_linear=include_linear)
+        bounds = calculate_bounds_efficient(X * np.sqrt(weights[:, np.newaxis]), R*np.sqrt(weights), axis_of_interest_normalized, include_linear=include_linear)
         bounds_list.append(bounds)
 
     return bounds_list

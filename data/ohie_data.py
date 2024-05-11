@@ -15,6 +15,16 @@ OHIE_DATA_PATH = CURRENT_FILE.parent / 'data_files' / 'OHIE_data.csv'
 # A list of the controls used in the linear regression in formula format:
 # CONTROLS_FORMULA = 'ddddraw_survey_12m1:numhh_list1 + ddddraw_survey_12m2:numhh_list1 + ddddraw_survey_12m3:numhh_list1 + ddddraw_survey_12m4:numhh_list1 + ddddraw_survey_12m5:numhh_list1 + ddddraw_survey_12m6:numhh_list1 + ddddraw_survey_12m7:numhh_list1 + ddddraw_survey_12m1:numhh_list2 + ddddraw_survey_12m2:numhh_list2 + ddddraw_survey_12m3:numhh_list2 + ddddraw_survey_12m4:numhh_list2 + ddddraw_survey_12m5:numhh_list2 + ddddraw_survey_12m6:numhh_list2 + ddddraw_survey_12m7:numhh_list2 + ddddraw_survey_12m1:numhh_list3 + ddddraw_survey_12m2:numhh_list3 + ddddraw_survey_12m3:numhh_list3'.replace(":", "__")
 
+def one_hot_to_categorical(data: pd.DataFrame, columns: List[str], categorical_name: str = 'categorical') -> pd.DataFrame:
+    # Check that the sum across these columns is always 1
+    assert (data[columns].sum(axis=1) == 1).all(), "One-hot encoding validation failed."
+    # Check that non-zero values in these columns are always 1
+    assert (data[columns] == 1).sum(axis=1).sum() == len(data), "Non-zero values are not all 1."
+
+    # B) Convert back to a categorical feature
+    data[categorical_name] = data[columns].idxmax(axis=1)
+    return data
+
 def load_ohie_regressions(iv: bool = False) -> List[NamedRegression]:
     """
     Loads a list of the linear regressions in the OHIE (Oregon Health Insurance Enrollments) study.
@@ -43,6 +53,7 @@ def load_ohie_regressions(iv: bool = False) -> List[NamedRegression]:
         subset=[instrument, cluster, weight] + controls
     )
     data[cluster] = data[cluster] - data[cluster].min()
+    data = one_hot_to_categorical(data, controls, 'ddd')
 
 
 
@@ -51,13 +62,15 @@ def load_ohie_regressions(iv: bool = False) -> List[NamedRegression]:
         if iv:
             outcome_regression = LinearRegression(
                 data=data.dropna(subset=[label, endogenous]),
-                formula=label + " ~ " + "+".join([instrument] + controls) + "-1",
+                formula=label + " ~ " + "+".join([instrument, "C(ddd)"]),
                 weight=weight,
+                special_categorical="ddd",
                 hc1_cluster=cluster
             )
             endogenous_regression = LinearRegression(
                 data=data.dropna(subset=[endogenous, label]),
-                formula=endogenous + " ~ " + "+".join([instrument] + controls) + "-1",
+                formula=endogenous + " ~ " + "+".join([instrument, "C(ddd)"]) + "-1",
+                special_categorical="ddd",
                 weight=weight,
                 hc1_cluster=cluster
             )
@@ -68,8 +81,9 @@ def load_ohie_regressions(iv: bool = False) -> List[NamedRegression]:
         else:
             outcome_regression = LinearRegression(
                 data=data.dropna(subset=[label]),
-                formula=label + " ~ " + "+".join([instrument] + controls) + "-1",
+                formula=label + " ~ " + "+".join([instrument, "C(ddd)"]) + "-1",
                 weight=weight,
+                special_categorical="ddd",
                 hc1_cluster=cluster
             )
             res.append(NamedRegression(
