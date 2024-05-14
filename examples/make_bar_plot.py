@@ -11,7 +11,7 @@ current_file_path = Path(__file__).parent
 cash_transfers_path = current_file_path / 'results/cash_transfers/results.csv'
 martinez_path = current_file_path / 'results/martinez/results.csv'
 eubank_path = current_file_path / 'results/eubank/results.csv'
-ohie_path = current_file_path / 'results/ohie/iv/robustness_bounds.csv'
+ohie_path = current_file_path / 'results/ohie_categorical/iv/robustness_bounds.csv'
 
 
 COLUMNS_TO_KEEP = ['AMIP', 'Lower Bound', 'Paper', 'singularity', 'dimension']
@@ -60,7 +60,7 @@ for exp in experiments:
     min_lower_bound = exp_data['Lower Bound'].min()
     dimension = exp_data['dimension'].min()
     if "singularity" in exp_data.columns:
-        singularity = exp_data['singularity'][0]
+        singularity = exp_data['singularity'].iloc[0]
     else:
         singularity = np.inf
     #
