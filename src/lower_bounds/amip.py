@@ -22,6 +22,13 @@ def f(w: np.ndarray, X: np.ndarray, residuals: np.ndarray, e: np.ndarray) -> flo
 
 
 def approximate_most_influential_pertrubation(X: np.ndarray, residuals: np.ndarray, e: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Implements the AMIP algorithm by BGM.
+    :param X: The features of the linear regression.
+    :param residuals: The residuals of the linear regression.
+    :param e: The axis of interest.
+    :return: AMIP order of removals and AMIP scores.
+    """
     # Initial weights (all ones)
     w_ones = np.ones(X.shape[0])
 
