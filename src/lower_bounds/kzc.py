@@ -158,7 +158,7 @@ def leave_one_out_regression_vectorized(X: np.ndarray, Y: np.ndarray, Sigma_inv_
 
 
 def efficient_greedy_removals(
-X: np.ndarray, residuals: np.ndarray, e: np.ndarray,progress_bar: bool = True
+X: np.ndarray, residuals: np.ndarray, e: np.ndarray,progress_bar: bool = True, k_max: Optional[int] = None
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Implements a more efficient version of the greedy algorithm by KZC.
@@ -172,13 +172,16 @@ X: np.ndarray, residuals: np.ndarray, e: np.ndarray,progress_bar: bool = True
 
     n, d = X.shape
 
+    if k_max is None:
+        k_max = n - d
+
     remaining_indices = list(range(n))
     samples_to_remove = []
     removal_effects = []
     X_retained = X.copy()
     R_retained = residuals.copy()
     # beta = np.linalg.inv(X.T @ X) @ X.T @ residuals
-    for _ in tqdm.trange(n-d, desc="Efficient KZC", disable=not progress_bar):
+    for _ in tqdm.trange(k_max, desc="Efficient KZC", disable=not progress_bar):
         B = leave_one_out_regression_vectorized(X_retained, R_retained)
         scores = (e[np.newaxis, :] @ B.T).ravel()
         assert scores.shape == (len(remaining_indices),)
@@ -195,7 +198,7 @@ X: np.ndarray, residuals: np.ndarray, e: np.ndarray,progress_bar: bool = True
 
 def greedy_removals(
 X: np.ndarray, residuals: np.ndarray, e: np.ndarray,
-efficient_kzc: bool = False, progress_bar: bool = True
+efficient_kzc: bool = True, progress_bar: bool = True, k_max: Optional[int] = None
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Implements the greedy algorithm by KZC.
@@ -206,15 +209,19 @@ efficient_kzc: bool = False, progress_bar: bool = True
     :param efficient_kzc: when set true, we will use a more efficient version of the kzc algorithm.
     :return: Removal order and removal effects
     """
-    if efficient_kzc:
-        return efficient_greedy_removals(X, residuals, e, progress_bar)
-
     n_samples, d = X.shape
+    if k_max is None:
+        k_max = n_samples-d
+
+    if efficient_kzc:
+        return efficient_greedy_removals(X, residuals, e, progress_bar, k_max=k_max)
+
     remaining_indices = list(range(n_samples))
     removal_order = []
     removal_effects = []
 
-    for _ in tqdm.trange(0, n_samples-d, desc="Computing KZC Removals", disable=not progress_bar):
+
+    for _ in tqdm.trange(0, k_max, desc="Computing KZC Removals", disable=not progress_bar):
         min_score = np.inf
         sample_to_remove = None
         for i in remaining_indices:

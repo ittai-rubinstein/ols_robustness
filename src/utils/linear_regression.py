@@ -176,7 +176,7 @@ class LinearRegression:
         if self.weight:
             split_weights = [bdf[self.weight].to_numpy() for bdf in bucket_dfs]
         else:
-            split_weights = [np.ones_like(sx) for sx in split_X]
+            split_weights = [np.ones_like(sr) for sr in split_R]
         X = np.vstack(split_X)
         residuals = np.concatenate(split_R)
         num_samples, dimension = X.shape

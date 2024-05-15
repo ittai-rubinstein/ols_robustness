@@ -5,6 +5,7 @@ import numpy as np
 import tqdm
 
 from src.lower_bounds.amip import approximate_most_influential_pertrubation
+from src.lower_bounds.kzc import greedy_removals
 from src.lower_bounds.lower_bounds import compute_removal_effects, compute_removal_effects_direct
 from src.lower_bounds.problem_1_lower_bounds import Problem1LowerBounds
 import src.lower_bounds.problem_1_lower_bounds as problem_1_lower_bounds
@@ -14,7 +15,7 @@ import src.lower_bounds.problem_1_lower_bounds as problem_1_lower_bounds
 class LowerBoundConfig:
     run_triple_greedy = False
     run_amip: bool = True
-    run_kzcs21: bool = False
+    run_kzc21: bool = True
     verbose: bool = True
     run_single_greedy: bool = False
 
@@ -164,7 +165,7 @@ class RemovalEffectsLowerBound:
     triple_greedy: Optional[LowerBoundResult] = None
     single_greedy: Optional[LowerBoundResult] = None
     amip: Optional[LowerBoundResult] = None
-    kzcs21: Optional[LowerBoundResult] = None
+    kzc21: Optional[LowerBoundResult] = None
 
     def __init__(
             self, X: np.ndarray, R: np.ndarray,
@@ -191,5 +192,10 @@ class RemovalEffectsLowerBound:
                 ),
                 removal_sets= [(amip_order[:k]).tolist() for k in range(1, len(amip_order) + 1)]
             )
-        if config.run_kzcs21:
-            raise NotImplementedError()
+        if config.run_kzc21:
+            n, d = X.shape
+            removal_order, removal_effects = greedy_removals(X, R, axis_of_interest, progress_bar=config.verbose, efficient_kzc=True, k_max=n//10)
+            self.kzc21 = LowerBoundResult(
+                removal_effects=removal_effects,
+                removal_sets=[(removal_order[:k]).tolist() for k in range(1, len(removal_order))]
+            )

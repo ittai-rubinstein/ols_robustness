@@ -7,6 +7,7 @@ import scipy
 import tqdm
 
 from src.lower_bounds.amip import approximate_most_influential_pertrubation
+from src.lower_bounds.kzc import greedy_removals
 from src.lower_bounds.one_hot_encodings import detect_one_hot_encodings, select_and_sort_quadrants, \
     compile_ordered_sample_indices, compute_quadrants_vectorized
 
@@ -15,6 +16,7 @@ from src.lower_bounds.one_hot_encodings import detect_one_hot_encodings, select_
 class BackupSortingLogic(Enum):
     XER = auto()
     AMIP = auto()
+    KZC = auto()
     NO_SORT = auto()
 
 @dataclass
@@ -63,6 +65,9 @@ def process_samples(X_orig: np.ndarray, norm_X: np.ndarray, residuals: np.ndarra
             ordered_indices.extend(sorted_indices)
         elif flags.BACKUP_SORTING_LOGIC == BackupSortingLogic.AMIP:
             sorted_indices, _ = approximate_most_influential_pertrubation(norm_X[remaining_indices], residuals[remaining_indices], axis_of_interest)
+            ordered_indices.extend([remaining_indices[i] for i in sorted_indices])
+        elif flags.BACKUP_SORTING_LOGIC == BackupSortingLogic.KZC:
+            sorted_indices, _ = greedy_removals(norm_X[remaining_indices], residuals[remaining_indices], axis_of_interest)
             ordered_indices.extend([remaining_indices[i] for i in sorted_indices])
         elif flags.BACKUP_SORTING_LOGIC == BackupSortingLogic.NO_SORT:
             ordered_indices.extend(remaining_indices)

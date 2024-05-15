@@ -391,9 +391,9 @@ class RobustnessAuditor:
             result["Triple Greedy"] = safe_min(indices[:len(triple_greedy)][ triple_greedy > self.parsed_data.beta_e])
 
 
-        if self.removal_effect_lower_bounds.kzcs21:
-            kzcs21 = self.removal_effect_lower_bounds.kzcs21.removal_effects
-            result["KZCS21"] = safe_min(indices[:len(kzcs21)][kzcs21 > self.parsed_data.beta_e])
+        if self.removal_effect_lower_bounds.kzc21:
+            kzc21 = self.removal_effect_lower_bounds.kzc21.removal_effects
+            result["KZC21"] = safe_min(indices[:len(kzc21)][kzc21 > self.parsed_data.beta_e])
 
         return result
 
@@ -419,9 +419,9 @@ class RobustnessAuditor:
         if self.removal_effect_lower_bounds.amip:
             ax.plot(k_vals[:len(self.removal_effect_lower_bounds.amip.removal_effects)],
                     self.removal_effect_lower_bounds.amip.removal_effects, 'r--', label='AMIP Lower Bound', linewidth=3)
-        if self.removal_effect_lower_bounds.kzcs21:
-            ax.plot(k_vals[:len(self.removal_effect_lower_bounds.kzcs21.removal_effects)],
-                    self.removal_effect_lower_bounds.kzcs21.removal_effects, 'r-.', label='KZCS21 Lower Bound', linewidth=3)
+        if self.removal_effect_lower_bounds.kzc21:
+            ax.plot(k_vals[:len(self.removal_effect_lower_bounds.kzc21.removal_effects)],
+                    self.removal_effect_lower_bounds.kzc21.removal_effects, 'r-.', label='KZC21 Lower Bound', linewidth=3)
         if self.removal_effect_lower_bounds.triple_greedy:
             ax.plot(
                 k_vals[:len(self.removal_effect_lower_bounds.triple_greedy.removal_effects)],
