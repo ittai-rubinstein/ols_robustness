@@ -42,6 +42,8 @@ class CategoricalAware:
 #     split_R: List[np.ndarray] = field(default_factory=list)
 #     split_Z: List[np.ndarray] = field(default_factory=list)
 
+
+
 @dataclass
 class RegressionArrays:
     X: np.ndarray
@@ -92,7 +94,7 @@ class LinearRegression:
         if self.hc1_cluster:
             self.model = model.fit(
                 cov_type="cluster",
-                cov_kwds={'groups': self.data[self.hc1_cluster] - self.data[self.hc1_cluster].min()}
+                cov_kwds={'groups': pd.factorize(self.data[self.hc1_cluster])[0] }
             )
         else:
             self.model = model.fit()

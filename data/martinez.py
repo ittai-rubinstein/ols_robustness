@@ -16,7 +16,8 @@ def load_martinez_linear_regression() -> LinearRegression:
     return LinearRegression(
         data=data,
         formula="lngdp14 ~ lndn13_fiw + fiw + fiw2 + lndn13 + C(year) + C(countrycode)",
-        special_categorical="countrycode"
+        special_categorical="countrycode",
+        hc1_cluster="countrycode"
     )
 
 def load_martinez_raw(keep_all_country_categories: bool = True) -> Tuple[pd.DataFrame, List[str]]:

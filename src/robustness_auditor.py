@@ -370,6 +370,7 @@ class RobustnessAuditor:
         self.upper_bound[self.upper_bound < 0] = np.inf
         result = {
             "fit_value": self.parsed_data.beta_e * self.parsed_data.beta_e_sign,
+            "fit_sign": self.parsed_data.beta_e_sign,
             "error_bar": self.parsed_data.delta_beta_e,
             "dimension": self.parsed_data.dimension,
             "num_samples": self.parsed_data.num_samples
