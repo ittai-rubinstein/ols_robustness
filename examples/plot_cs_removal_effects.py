@@ -7,6 +7,10 @@ import numpy as np
 from tqdm import tqdm, trange  # Import tqdm for progress bars
 import numpy as np
 import os
+from src.robustness_auditor import AuditorConfig, RobustnessAuditor
+from src.utils.linear_regression import LinearRegression
+import pandas as pd
+
 CURRENT_FILE = Path(__file__).resolve()
 RESULTS_PATH = CURRENT_FILE.parent / "results" / "figures" / "cs_vs_ra"
 CS_OUTPUT_DIR = RESULTS_PATH / "covariance_shift"
@@ -23,6 +27,9 @@ FONTSIZE = 'xx-large'
 YLIM = (-11, 11)
 XLIM = (-11, 11)
 LOOP_WAIT = 500
+
+num_inliers = 1000
+num_outliers = 100
 
 
 def fit_to_linear_growth(input_array):
@@ -192,23 +199,51 @@ def generate_plots(dataset_1: np.ndarray, dataset_2: np.ndarray, output_dir: str
 # Set random seed for reproducibility
 np.random.seed(42)
 
+# c = 3  # Center distance from origin, adjustable parameter
+# p = 0.52  # Fraction of inliers on the main diagonals
+#
+# # Standard deviation for each cluster
+# std_dev = 0.5  # Adjust to change the spread of the Gaussian clouds
+#
+# # Generate labels to choose diagonal or off-diagonal clusters
+# diagonal_labels = np.random.choice([0, 1], size=num_inliers, p=[p, 1-p])
+#
+# # Coordinates for the four possible centers
+# centers = np.array([[c, c], [-c, -c], [c, -c], [-c, c]])
+#
+# # Map labels to center indices: 0 or 1 for main diagonal, 2 or 3 for off-diagonal
+# center_indices = np.where(diagonal_labels == 0, np.random.choice([0, 1], size=num_inliers),
+#                           np.random.choice([2, 3], size=num_inliers))
+#
+# # Select the centers based on the randomly chosen indices
+# selected_centers = centers[center_indices]
+#
+# # Generate Gaussian noise
+# noise = np.random.normal(0, std_dev, (num_inliers, 2))
+#
+# dataset_1 = selected_centers + noise
+# Final x and y values: center coordinates plus noise
+# x_values, y_values = selected_centers + noise
+
+# Store the dataset as an n by 2 NumPy array
+# dataset_1 = np.column_stack((x_values, y_values))
+
+# Second dataset with 100 samples of (1, -1) or (-1, 1)
+
 # First dataset with 1000 points
-num_points = 1000
-x_values = -1 + (2*np.random.rand(num_points))
-small_error = np.random.normal(0, 0.2, num_points)  # Small Gaussian error
+x_values = -1 + (2*np.random.rand(num_inliers))
+small_error = np.random.normal(0, 0.2, num_inliers)  # Small Gaussian error
 y_values = x_values + small_error
 # Storing the first dataset as an n by 2 NumPy array
 dataset_1 = np.column_stack((x_values, y_values))
 
-# Second dataset with 100 samples of (1, -1) or (-1, 1)
-num_samples = 100
-x_values = np.random.choice([-1, 1], size=(num_samples, 1))
+x_values = np.random.choice([-1, 1], size=(num_outliers, 1))
 FACTOR = 10
 ERROR_SIZE=0.2
 y_values = -10*x_values
 dataset_2 = np.column_stack((
-    x_values + np.random.normal(0, ERROR_SIZE , (num_samples, 1)),
-    y_values + np.random.normal(0, ERROR_SIZE, (num_samples, 1))
+    x_values + np.random.normal(0, ERROR_SIZE, (num_outliers, 1)),
+    y_values + np.random.normal(0, ERROR_SIZE, (num_outliers, 1))
 ))
 dataset_2 = dataset_2
 
@@ -218,16 +253,14 @@ if False:
 
 
 # Second dataset with 100 samples of (1, -1) or (-1, 1)
-np.random.seed(1)
-num_samples = 100
-x_values = np.random.choice([-1, 1], size=(num_samples, 1))
+x_values = np.random.choice([-1, 1], size=(num_outliers, 1))
 FACTOR = 10
 ERROR_SIZE=0.2
 x_values *= FACTOR
 y_values = -x_values
 dataset_3 = np.column_stack((
-    x_values + np.random.normal(0, ERROR_SIZE, (num_samples, 1)),
-    y_values + np.random.normal(0, ERROR_SIZE , (num_samples, 1))
+    x_values + np.random.normal(0, ERROR_SIZE, (num_outliers, 1)),
+    y_values + np.random.normal(0, ERROR_SIZE, (num_outliers, 1))
 ))
 
 
@@ -260,5 +293,31 @@ def fit_function_to_array(input_array):
     return fitted_array
 
 
+# Combine the datasets
+combined_data = np.vstack((dataset_1, dataset_3))
+
+# Create the DataFrame
+df = pd.DataFrame(combined_data, columns=['X', 'Y'])
+
+
+ra = RobustnessAuditor(
+    LinearRegression(data=df, formula="Y~X-1", column_of_interest="X"),
+    config=AuditorConfig(
+        output_dir=CS_OUTPUT_DIR, reaverage=False
+    )
+)
+
+ra.compute_all_bounds(categorical_aware=False)
+print(ra.summary())
+print(ra.summary()["AMIP"])
+print(ra.summary()["KZC21"])
+print(ra.summary()["Lower Bound"])
+print(ra.linear_regression.model.summary())
+kzc = ra.removal_effect_lower_bounds.kzc21
+print(kzc.removal_sets[ra.summary()["KZC21"]])
+
+# assert False
 BETA_FIT = fit_function_to_array
 generate_plots(dataset_1, dataset_3, CS_OUTPUT_DIR)
+
+
