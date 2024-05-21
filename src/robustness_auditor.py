@@ -11,12 +11,15 @@ from matplotlib import pyplot as plt
 from src.categorical_data.categorical_data import compute_bounds_for_all
 from src.categorical_data.dynamic_programming import dynamic_programming_1d
 from src.categorical_data.ku_triangle_inequality import KUMetadata, KUData, compute_ku_bounds, extract_k_bounds
+from src.geometric_algorithms.hypercontractivity_reduction import bound_42_hypercontractivity_gm
 from src.geometric_algorithms.spectral_algorithms import spectral_bound_sum_ips
 from src.geometric_algorithms.triangle_inequality import refined_triangle_inequality_ips
 from src.problem_1 import Problem1, Problem1Params
 from src.lower_bounds.removal_effects import LowerBoundConfig, RemovalEffectsLowerBound
 from src.utils.linear_regression import LinearRegression
 from src.utils.safe_min import safe_min
+import time
+from memory_profiler import memory_usage
 
 SWITCH_TO_FLOAT32 = False
 # @dataclass
@@ -35,6 +38,14 @@ class AuditorConfig:
     lower_bounds_params: LowerBoundConfig = field(default_factory=LowerBoundConfig)
     compute_freund_hopkins: bool = False
 
+    def __post_init__(self):
+        self.output_dir = Path(self.output_dir)
+
+
+@dataclass
+class ProfileResult:
+    execution_time: float
+    peak_memory_usage: float
 
 
 @dataclass
@@ -89,6 +100,7 @@ class RobustnessAuditor:
     removal_effect_lower_bounds: RemovalEffectsLowerBound
     freund_and_hopkins_upper_bound: Optional[np.ndarray] = None
     categorical_upper_bounds: Optional[CategoricalUpperBounds] = None
+    profile_results: Optional[ProfileResult] = None
 
     def __init__(self, linear_regression: LinearRegression, config: AuditorConfig):
         self.linear_regression = linear_regression
@@ -252,6 +264,18 @@ class RobustnessAuditor:
         )
 
     def compute_all_bounds(self, categorical_aware: bool = False):
+        def wrapper():
+            self._compute_all_bounds(categorical_aware)
+
+        start_time = time.time()
+        mem_usage, _ = memory_usage((wrapper,), max_usage=True, retval=True)
+        end_time = time.time()
+
+        execution_time = end_time - start_time
+        peak_memory_usage = mem_usage
+        self.profile_results = ProfileResult(execution_time, peak_memory_usage)
+
+    def _compute_all_bounds(self, categorical_aware: bool = False):
 
         self.removal_effect_lower_bounds = RemovalEffectsLowerBound(
             X=self.parsed_data.X,
@@ -293,7 +317,7 @@ class RobustnessAuditor:
         axis_of_interest_normalized = self.linear_regression.categorical_aware.axis_of_interest_normalized
 
         # Set the high-level parameters for the ku bounds that we will use later on.
-        ku_params = KUMetadata(k_max=num_samples // 10 + 1, u_max=len(split_X) + 1,
+        ku_params = KUMetadata(k_max=int(num_samples * self.config.problem_1_params.k_max_factor) + 1, u_max=len(split_X) + 1,
                                bucket_sizes=[len(sr) for sr in split_R])
 
         # Step 1: Compute bounds on the direct effects of removals for the categorical data:
@@ -303,7 +327,8 @@ class RobustnessAuditor:
             split_X, split_R, axis_of_interest_normalized, split_weights
         )
         # Use a dynamic programming algorithm to solve the integer knapsack to maximize the total direct influences
-        total_score_bounds = dynamic_programming_1d(bounds_list, num_samples // 10 + 1)[1:]
+
+        total_score_bounds = dynamic_programming_1d(bounds_list, int(num_samples * self.config.problem_1_params.k_max_factor) + 1)[1:]
 
         # Step 2: Bound the categorical aware covariance shift phenomena
 
@@ -396,6 +421,10 @@ class RobustnessAuditor:
             kzc21 = self.removal_effect_lower_bounds.kzc21.removal_effects
             result["KZC21"] = safe_min(indices[:len(kzc21)][kzc21 > self.parsed_data.beta_e])
 
+        if self.profile_results:
+            result["Runtime"] = self.profile_results.execution_time
+            result["Memory"] = self.profile_results.peak_memory_usage
+
         return result
 
     def plot_removal_effects(self):
@@ -451,3 +480,16 @@ class RobustnessAuditor:
 
         # Return the axes for further manipulation if necessary
         return ax
+
+
+    def compute_freund_hopkins(self):
+        X = self.parsed_data.X
+        ks = np.arange(1, self.parsed_data.num_samples)
+        hyper_gram_matrix = bound_42_hypercontractivity_gm(X)
+        eigvals_hyper, eigvecs_hyper = np.linalg.eigh(hyper_gram_matrix)
+        # Replicate the Freund and Hopkins analysis as a baseline:
+        XR = self.parsed_data.XR
+        C1 = np.max(np.linalg.eigvalsh(XR @ XR.T))
+        C2 = np.max(eigvals_hyper)
+        self.freund_and_hopkins_upper_bound = np.sqrt(C1 * ks) / (1 - np.sqrt(C2 * ks))
+        self.freund_and_hopkins_upper_bound[C2 * ks >= 1] = np.inf

@@ -21,6 +21,8 @@ class Problem1Params:
     # We may store the gram matrix even after we are done using it. If this is set to True, we will discard it to save RAM.
     save_memory: bool = True
 
+    k_max_factor: float = 0.1
+
 
 
 @dataclass
