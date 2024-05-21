@@ -39,6 +39,8 @@ ra = RobustnessAuditor(
     )
 )
 
+ra.compute_all_bounds()
+
 ra_spectral = RobustnessAuditor(
     regression,
     AuditorConfig(
@@ -49,8 +51,10 @@ ra_spectral = RobustnessAuditor(
 )
 
 ra_spectral.compute_all_bounds()
+ra.compute_freund_hopkins()
 
 print(ra.summary())
+print(ra_spectral.summary())
 
 two_sigma = 2 * ra.parsed_data.delta_beta_e
 two_sigma: float
@@ -123,7 +127,7 @@ plt.figure(figsize=(12, 10), dpi=500)
 LINEWIDTH = 5
 # Plotting ACRE in red
 plt.plot(k[:len(ACRE)], ACRE[:len(k)], '--', color='red', linewidth=LINEWIDTH, label=r'$\text{ACRE}_\text{RTI}$')
-plt.plot(k[:len(ACRE)], ACRE_spectral[:len(k)], '-', color='red', linewidth=LINEWIDTH, label=r'$\text{ACRE}_\text{spectral}$')
+plt.plot(k[:len(ACRE_spectral)], ACRE_spectral[:len(k)], '-', color='red', linewidth=LINEWIDTH, label=r'$\text{ACRE}_\text{spectral}$')
 
 # Plotting Freund_Hopkins in green
 plt.plot(k[:len(Freund_Hopkins)], Freund_Hopkins[:len(k)], color='green', linewidth=LINEWIDTH, label='Freund & Hopkins')

@@ -5,6 +5,8 @@ from scipy.linalg import sqrtm
 import tqdm
 import dask.array as da
 
+NUM_CORES = 1
+
 def refined_triangle_inequality_ips(gram_matrix: np.ndarray, verbose: bool = True) -> np.ndarray:
     """
     An algorithm for bounding the l2 norm of any subset of size k of out a set of vectors.
@@ -23,7 +25,7 @@ def refined_triangle_inequality_ips(gram_matrix: np.ndarray, verbose: bool = Tru
     # Step 1: Copy and zero out the diagonal
     diag_elements = np.diag(gram_matrix).copy()
     np.fill_diagonal(gram_matrix, 0)
-    dist_gram_matrix = da.from_array(gram_matrix, chunks=(n//8, n))
+    dist_gram_matrix = da.from_array(gram_matrix, chunks=(n//NUM_CORES, n))
     del gram_matrix
 
     # Step 2: Sort each row
