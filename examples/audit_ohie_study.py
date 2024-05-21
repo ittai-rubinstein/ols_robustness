@@ -1,3 +1,6 @@
+import time
+from datetime import timedelta
+
 import pandas as pd
 import numpy as np
 
@@ -17,6 +20,7 @@ base_dir = CURRENT_DIR / "results" / "ohie_categorical"
 
 
 results = []
+t0 = time.time()
 print("Running robustness auditor on IV regressors:")
 for iv_regression in iv_regressions:
     for (name, regression) in [
@@ -25,7 +29,7 @@ for iv_regression in iv_regressions:
     ]:
         for i in range(2):
             print('*'*80)
-        print(f"Running on {name=}")
+        print(f"Running on {name=}, dt={timedelta(time.time() - t0)}")
         for i in range(2):
             print('*'*80)
         output_dir = base_dir / "iv" /name
