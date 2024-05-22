@@ -298,7 +298,6 @@ class RobustnessAuditor:
         xz_term = self.XZ_bounds.upper_bounds.combined_bound
         xr_term = self.XR_bounds.upper_bounds.combined_bound
         xzr_term = self.XZR_bounds.upper_bounds.combined_bound
-        print("Setting self.upper_bound!!!!!")
         self.upper_bound = self.linear_effect + (xzr_term ** 2) + ((cs_term * xr_term * xz_term) / (1 - cs_term))
         self._compute_k_singular()
 

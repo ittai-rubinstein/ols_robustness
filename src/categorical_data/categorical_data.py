@@ -23,7 +23,6 @@ def split_and_normalize(
     Returns:
     List[pd.DataFrame]: A list of smaller dataframes, each normalized by subtracting the mean of continuous features.
     """
-    print(f"{weights=}")
     smaller_dfs = []
     for col in tqdm.tqdm(one_hot_columns, desc="Separating by categorical columns", disable=not verbose):
         # Select rows where the one-hot encoded column is 1

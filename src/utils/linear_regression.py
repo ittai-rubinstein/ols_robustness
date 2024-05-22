@@ -92,9 +92,10 @@ class LinearRegression:
         else:
             model = smf.ols(formula=self.formula, data=self.data)
         if self.hc1_cluster:
+            groups = pd.factorize(self.data[self.hc1_cluster])[0]
             self.model = model.fit(
                 cov_type="cluster",
-                cov_kwds={'groups': pd.factorize(self.data[self.hc1_cluster])[0] }
+                cov_kwds={'groups':  groups}
             )
         else:
             self.model = model.fit()

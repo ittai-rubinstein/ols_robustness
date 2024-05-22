@@ -87,6 +87,9 @@ def load_angelucci_data(
     else:
         formula = FORMULA2
 
+    features = ["Cind"] + [s.strip() for s in formula.split("~")[1].split("+") if not s.strip().startswith("C(")]
+    # print(f"{features=}")
+
     # The hectacres column used in the regression is highly non-hypercontractive, with <0.5% of the samples
     # contributing >80% of the variance. To counter this, we measure the effect of replacing this column with
     # log(hectacres) instead. However, about 25-50% of households have no land at all, so we add 1 hectacre
@@ -101,6 +104,7 @@ def load_angelucci_data(
         for treatment in ["p", "np"]:
             treated_samples = current_samples.copy()
             treated_samples["treatment"] = treated_samples[f"treat{treatment}"]
+            treated_samples = treated_samples.dropna(subset=features)
             regressions.append(
                 AngelucciDataset(
                     treatment=treatment,
