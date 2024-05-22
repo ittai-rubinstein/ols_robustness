@@ -109,6 +109,7 @@ def load_angelucci_data(
                         data=treated_samples,
                         formula=formula,
                         column_of_interest="treatment",
+                        hc1_cluster="village",
                         # special_categorical=None
                         special_categorical="region_1" if which_regression == 1 else None
                     )
