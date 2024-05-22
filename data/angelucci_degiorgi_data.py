@@ -21,7 +21,7 @@ class AngelucciDataset(NamedTuple):
     regression: LinearRegression
 
 
-# Conversion of 'hhhage' to numerical
+# Conversion of 'hhhage' to numerical. This conversion is applied implicitly by Angelucci and De Giorgi and by Broderick et al.
 HHHAGE_REPLACEMENTS= {
     '97 y más': 97,  # Replace '97 y más' with 97
     'no sabe': 98,  # Replace 'no sabe' with 98
@@ -66,7 +66,7 @@ def load_angelucci_data(
     """
     # Load the data from the .dta file
     data = pd.read_stata( CURRENT_FILE.parent / "data_files" / "angelucci_table1.dta")
-    # Filter data for Cind < 10000
+    # Filter data for Cind < 10000. This filter is applied in both BGM20 and Angelucci and De Giorgi's original paper.
     filtered_data = data[data['Cind'] < 10000]
 
     filtered_data.loc[:, 'hhhage'] = filtered_data['hhhage'].replace(HHHAGE_REPLACEMENTS)
@@ -78,6 +78,7 @@ def load_angelucci_data(
 
     # Rename the 'hhhage_float' column to 'hhhage'
     filtered_data = filtered_data.rename(columns={'hhhage_float': 'hhhage'})
+    filtered_data = filtered_data[filtered_data['hhhage'] < 97]
 
     filtered_data = remove_bad_categorical_rows(filtered_data)
 

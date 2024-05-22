@@ -275,8 +275,6 @@ class RobustnessAuditor:
         peak_memory_usage = mem_usage
         self.profile_results = ProfileResult(execution_time, peak_memory_usage)
 
-        print(self.upper_bound)
-
     def _compute_all_bounds(self, categorical_aware: bool = False):
 
         self.removal_effect_lower_bounds = RemovalEffectsLowerBound(

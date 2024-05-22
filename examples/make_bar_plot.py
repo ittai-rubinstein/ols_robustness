@@ -3,6 +3,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+import matplotlib.pyplot as plt
 
 # Load the Martinez data
 current_file_path = Path(__file__).parent
@@ -13,83 +14,110 @@ martinez_path = current_file_path / 'results/martinez/results.csv'
 eubank_path = current_file_path / 'results/eubank/results.csv'
 ohie_path = current_file_path / 'results/ohie_categorical/iv/robustness_bounds.csv'
 
-COLUMNS_FOR_TABLE = []  # Update this list as needed
+COLUMNS_FOR_TABLE = ["Runtime", "Memory"]  # Update this list as needed
 COLUMNS_TO_KEEP = ['AMIP', 'Lower Bound', 'Paper', 'singularity', 'dimension', "KZC21", "Regression"] + COLUMNS_FOR_TABLE
 
 
-martinez_df = pd.read_csv(martinez_path).drop(columns=["Unnamed: 0"])
-print(martinez_df.columns)
-print(martinez_df.describe())
-# assert  False
+def process_results(file_path):
+    # Read the CSV file and drop the unnecessary column
+    df = pd.read_csv(file_path).drop(columns=["Unnamed: 0"])
 
-# Extract relevant details
-amip = martinez_df['AMIP'].iloc[0]  # Assuming AMIP value is constant across rows
-categorical_aware_bound = martinez_df.loc[martinez_df['categorical_aware'] == True, 'Lower Bound'].min()
-categorical_unaware_bound = martinez_df.loc[martinez_df['categorical_aware'] == False, 'Lower Bound'].min()
+    # Print column names and descriptive statistics
+    print(df.columns)
+    print(df.describe())
 
-martinez_summary = pd.DataFrame({
-    'AMIP': [amip],
-    'Categorical Aware Lower Bound': [categorical_aware_bound],
-    'Categorical Unaware Lower Bound': [categorical_unaware_bound],
-    'dimension': [martinez_df.loc[martinez_df['categorical_aware'] == True, 'dimension'].min()],
-    'singularity': [martinez_df.loc[martinez_df['categorical_aware'] == True, 'singularity'].min()],
-    "KZC21": [martinez_df["KZC21"].min()],
-    "Regression": ""
-})
+    # Extract relevant details
+    amip = df['AMIP'].iloc[0]  # Assuming AMIP value is constant across rows
+    categorical_aware_bound = df.loc[df['categorical_aware'] == True, 'Lower Bound'].min()
+    categorical_unaware_bound = df.loc[df['categorical_aware'] == False, 'Lower Bound'].min()
+    dimension = df.loc[df['categorical_aware'] == True, 'dimension'].min()
+    singularity = df.loc[df['categorical_aware'] == True, 'singularity'].min()
+    kzc21 = df['KZC21'].min()
+    runtime = df.loc[df['categorical_aware'] == True, 'Runtime'].min()
+    memory = df.loc[df['categorical_aware'] == True, 'Memory'].min()
 
-eubank_df = pd.read_csv(eubank_path).drop(columns=["Unnamed: 0"])
+    summary = pd.DataFrame({
+        'AMIP': [amip],
+        'Categorical Aware Lower Bound': [categorical_aware_bound],
+        'Categorical Unaware Lower Bound': [categorical_unaware_bound],
+        'dimension': [dimension],
+        'singularity': [singularity],
+        'KZC21': [kzc21],
+        'Runtime': [runtime],
+        'Memory': [memory],
+        'Regression': ""
+    })
 
-# Extract relevant details
-amip = eubank_df['AMIP'].iloc[0]  # Assuming AMIP value is constant across rows
-categorical_aware_bound = eubank_df.loc[eubank_df['categorical_aware'] == True, 'Lower Bound'].min()
-categorical_unaware_bound = eubank_df.loc[eubank_df['categorical_aware'] == False, 'Lower Bound'].min()
-
-eubank_summary = pd.DataFrame({
-    'AMIP': [amip],
-    'Categorical Aware Lower Bound': [categorical_aware_bound],
-    'Categorical Unaware Lower Bound': [categorical_unaware_bound],
-    'dimension': [eubank_df.loc[eubank_df['categorical_aware'] == True, 'dimension'].min()],
-    'singularity': [eubank_df.loc[eubank_df['categorical_aware'] == True, 'singularity'].min()],
-    "KZC21": [eubank_df["KZC21"].min()],
-    "Regression": ""
-})
+    return summary
 
 
-ohie_df = pd.read_csv(ohie_path).drop(columns=["Unnamed: 0"])
+# Process the Martinez results
+martinez_summary = process_results(martinez_path)
 
-# Process experiments
-experiments = ohie_df['experiment'].str.replace('_end', '').str.replace('_out', '').unique()
-ohie_summary = []
-
-OHIE_EXP_TO_NAME = {
-    "health_genflip_bin_12m": "Health genflip 12m",
-    "health_notpoor_12m": "Health notpoor 12m",
-    "health_chgflip_bin_12m": "Health change flip 12m",
-    "notbaddays_tot_12m": "Not bad days total 12m",
-    "notbaddays_phys_12m": "Not bad days physical 12m",
-    "notbaddays_ment_12m": "Not bad days mental 12m",
-    "nodep_screen_12m": "Nodep Screen 12m"
-}
+# Process the Eubank results
+eubank_summary = process_results(eubank_path)
 
 
-for exp in experiments:
-    exp_data = ohie_df[ohie_df['experiment'].str.contains(exp)]
+def process_ohie_experiment(df, exp, exp_to_name):
+    exp_data = df[df['experiment'].str.contains(exp)]
     min_amip = exp_data['AMIP'].min()
     min_lower_bound = exp_data['Lower Bound'].min()
     dimension = exp_data['dimension'].min()
-    if "singularity" in exp_data.columns:
-        singularity = exp_data['singularity'].iloc[0]
-    else:
-        singularity = np.inf
-    #
-    ohie_summary.append({
-        'Experiment': exp, 'Min AMIP': min_amip, 'Min Lower Bound': min_lower_bound,
-        "dimension": dimension, "singularity": singularity,
-        "KZC21": exp_data["KZC21"][exp_data["KZC21"] != np.inf].min().astype(int), "Regression": OHIE_EXP_TO_NAME[exp]
+    singularity = exp_data['singularity'].iloc[0] if "singularity" in exp_data.columns else np.inf
+    kzc21 = exp_data["KZC21"][exp_data["KZC21"] != np.inf].min().astype(int)
+    runtime = exp_data['Runtime'].sum()
+    memory = exp_data['Memory'].max()
 
-    })
+    return {
+        'Experiment': exp,
+        'AMIP': min_amip,
+        'Lower Bound': min_lower_bound,
+        'dimension': dimension,
+        'singularity': singularity,
+        'KZC21': kzc21,
+        'Runtime': runtime,
+        'Memory': memory,
+        'Regression': exp_to_name.get(exp, "")
+    }
 
-ohie_summary_df = pd.DataFrame(ohie_summary)
+def process_ohie_results(file_path, exp_to_name, order):
+    df = pd.read_csv(file_path).drop(columns=["Unnamed: 0"])
+    experiments = df['experiment'].str.replace('_end', '').str.replace('_out', '').unique()
+
+    summary = [process_ohie_experiment(df, exp, exp_to_name) for exp in experiments]
+    summary_df = pd.DataFrame(summary)
+
+    summary_df['Experiment'] = pd.Categorical(summary_df['Experiment'], categories=order, ordered=True)
+    summary_df = summary_df.sort_values('Experiment')
+    summary_df['Paper'] = 'OHIE'
+    return summary_df
+
+# Define the mapping and order
+OHIE_EXP_TO_NAME = {
+    "health_genflip_bin_12m": "Health genflip",
+    "health_notpoor_12m": "Health notpoor",
+    "health_chgflip_bin_12m": "Health change flip",
+    "notbaddays_tot_12m": "Not bad days total",
+    "notbaddays_phys_12m": "Not bad days physical",
+    "notbaddays_ment_12m": "Not bad days mental",
+    "nodep_screen_12m": "Nodep Screen"
+}
+
+order = [
+    "health_genflip_bin_12m",
+    "health_notpoor_12m",
+    "health_chgflip_bin_12m",
+    "notbaddays_tot_12m",
+    "notbaddays_phys_12m",
+    "notbaddays_ment_12m",
+    "nodep_screen_12m"
+]
+
+# Process the OHIE results
+ohie_summary_df = process_ohie_results(ohie_path, OHIE_EXP_TO_NAME, order)
+print(ohie_summary_df)
+
+
 
 
 # Load the Cash Transfers data
@@ -105,12 +133,9 @@ cash_transfers_df = pd.concat([cash_transfers_df, parsed_experiments], axis=1)
 
 # Sort the dataframe by Treatment and Time Point
 cash_transfers_df.sort_values(by=['Treatment', 'Time Point'], ascending=[True, True], inplace=True)
-print(cash_transfers_df.head())
-print(cash_transfers_df.columns)
+# Cash Transfers - sorting by treatment and time
+cash_transfers_df['Paper'] = 'Cash\nTransfer'
 
-
-
-import matplotlib.pyplot as plt
 
 # Martinez - already summarized
 martinez_df = martinez_summary
@@ -120,22 +145,9 @@ martinez_df['Paper'] = 'Nightlights'
 eubank_df = eubank_summary
 eubank_df['Paper'] = 'VRA'
 
-# Cash Transfers - sorting by treatment and time
-cash_transfers_df['Paper'] = 'Cash Transfer'
 
-# OHIE - sorting by a predefined order
-order = [
-    "health_genflip_bin_12m",
-    "health_notpoor_12m",
-    "health_chgflip_bin_12m",
-    "notbaddays_tot_12m",
-    "notbaddays_phys_12m",
-    "notbaddays_ment_12m",
-    "nodep_screen_12m"
-]
-ohie_summary_df['Experiment'] = pd.Categorical(ohie_summary_df['Experiment'], categories=order, ordered=True)
-ohie_summary_df = ohie_summary_df.sort_values('Experiment')
-ohie_summary_df['Paper'] = 'OHIE'
+
+
 # Martinez Data Adjustment
 martinez_df.rename(columns={'Categorical Aware Lower Bound': 'Lower Bound'}, inplace=True)
 martinez_df['AMIP'] = martinez_df['AMIP']  # Ensure there is an 'AMIP' column if missing
@@ -144,15 +156,14 @@ martinez_df = martinez_df[COLUMNS_TO_KEEP]
 eubank_df.rename(columns={'Categorical Aware Lower Bound': 'Lower Bound'}, inplace=True)
 eubank_df = eubank_df[COLUMNS_TO_KEEP]
 
-# OHIE Data Adjustment
-ohie_summary_df.rename(columns={'Min AMIP': 'AMIP', 'Min Lower Bound': 'Lower Bound'}, inplace=True)
+
 # ohie_summary_df = ohie_summary_df[COLUMNS_TO_KEEP]
 
 # Filtering Cash Transfers data for plotting
 plot_cash_transfers_df = cash_transfers_df[cash_transfers_df['Log Hectares'] == True]
 
 # Concatenate all dataframes for plotting
-all_data = pd.concat([martinez_df, plot_cash_transfers_df, ohie_summary_df, eubank_df])
+all_data = pd.concat([martinez_df, plot_cash_transfers_df, ohie_summary_df])
 
 # Plotting code as previously described, using the 'all_data' DataFrame
 fig, ax = plt.subplots(figsize=(12, 10), dpi=500)
@@ -215,9 +226,7 @@ plt.savefig(current_file_path / "results" / "figures" / "bar_plot.png")
 
 # Function to generate LaTeX table
 def generate_latex_table(all_data, papers, COLUMNS_TO_PLOT, COLUMNS_FOR_TABLE):
-    latex_lines = []
-    latex_lines.append("\\begin{tabular}{lcccccc}")
-    latex_lines.append("\\hline")
+    latex_lines = ["\\begin{tabular}{lcccccc" + ("c"*len(COLUMNS_FOR_TABLE)) + "}", "\\hline"]
     header = ["Paper", "Regression", "n", "d"] + COLUMNS_TO_PLOT[:-1] + ["OHARE"] + COLUMNS_FOR_TABLE
     latex_lines.append(" & ".join(header) + " \\\\")
     latex_lines.append("\\hline")
@@ -260,6 +269,16 @@ def convert_memory_to_human_readable(mem_mib: float) -> str:
 # Update the "Memory" column with human-readable values
 all_data["Memory"] = all_data["Memory"].apply(lambda x: convert_memory_to_human_readable(x))
 
+# Function to convert runtime in seconds to a human-readable format
+def convert_runtime_to_human_readable(seconds):
+    minutes = int(seconds // 60)
+    remaining_seconds = seconds % 60
+    if minutes > 0:
+        return f"{minutes} m {int(np.ceil(remaining_seconds))} s"
+    else:
+        return f"{int(np.ceil(remaining_seconds))} s"
+
+all_data["Runtime"] = all_data["Runtime"].apply(lambda x: convert_runtime_to_human_readable(x))
 
 
 # Generate LaTeX table
